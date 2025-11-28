@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>HK Trip 2025</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#F08A5D" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HK Trip">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+    <!-- Importing LXGW WenKai Lite for the hard-pen calligraphy style -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-lite-webfont@1.7.0/style.css" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              // Using LXGW WenKai Lite as the primary font for that hard-pen feel
+              hand: ['"LXGW WenKai Lite"', '"Patrick Hand"', 'cursive', 'sans-serif'],
+            },
+            colors: {
+              paper: '#FDF6E3',
+              ink: '#2B2B2B',
+              autumn: {
+                100: '#FDE6D2',
+                200: '#FBC4AB',
+                300: '#F08A5D',
+                400: '#B83B5E',
+                500: '#6A2C70',
+              }
+            },
+            boxShadow: {
+              'sketch': '2px 2px 0px 0px #2B2B2B',
+              'sketch-lg': '4px 4px 0px 0px #2B2B2B',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #FDF6E3;
+        font-family: 'LXGW WenKai Lite', 'Patrick Hand', cursive, sans-serif;
+        color: #2B2B2B;
+        overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
+      }
+      /* Custom Scrollbar for a cleaner look */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #F08A5D;
+        border-radius: 10px;
+      }
+      /* Fix for iOS date input appearance */
+      input[type="date"] {
+        appearance: none;
+        -webkit-appearance: none;
+        background-color: transparent;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
