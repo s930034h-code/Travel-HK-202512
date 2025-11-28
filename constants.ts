@@ -1,5 +1,7 @@
 import { DailyItinerary, GeneralInfo, WeatherForecast } from './types';
 
+export const EXCHANGE_RATE = 4.15;
+
 export const ITINERARY_DATA: DailyItinerary[] = [
   {
     day: 1,
@@ -402,5 +404,3 @@ export const WEATHER_DATA: WeatherForecast[] = [
   { date: '12/14 (日)', temp: '15°C - 20°C', condition: '晴朗乾燥', icon: 'sunny', humidity: '60%' },
   { date: '12/15 (一)', temp: '18°C - 23°C', condition: '偶有小雨', icon: 'rainy', humidity: '75%' },
 ];
-
-export const EXCHANGE_RATE = 4.15; // 1 HKD = 4.15 TWD (Approx)

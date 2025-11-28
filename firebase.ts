@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import * as firebaseApp from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 
 // ⚠️ 重要：請將下方的設定替換成您在 Firebase Console 複製的內容
@@ -14,5 +14,5 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = firebaseApp.initializeApp(firebaseConfig);
 export const db = getDatabase(app);

@@ -1,3 +1,4 @@
+
 export interface ItineraryEvent {
   time: string;
   activity: string;
@@ -21,11 +22,16 @@ export interface DailyItinerary {
 export interface Expense {
   id: string;
   item: string;
-  amountHKD: number;
-  paidBy: string;
+  amountHKD: number; // The calculated amount in HKD (if original was TWD, this is converted)
+  amountTWD: number; // The calculated amount in TWD (if original was HKD, this is converted)
+  originalAmount: number; // What the user typed
+  currency: 'HKD' | 'TWD'; // Currency of the original amount
+  paidBy: string; // Who paid
+  beneficiaries: string[]; // Who involves in this bill (for splitting)
   category: 'food' | 'transport' | 'shopping' | 'other';
   date: string;
   paymentMethod: 'cash' | 'card' | 'applepay' | 'octopus';
+  timestamp: number;
 }
 
 export interface WeatherForecast {
