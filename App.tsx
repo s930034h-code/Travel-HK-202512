@@ -14,7 +14,7 @@ const App: React.FC = () => {
       <header className="pt-8 pb-4 px-6 bg-autumn-200 rounded-b-[2rem] shadow-md border-b-2 border-stone-800 z-10 flex-shrink-0 relative overflow-hidden">
         <div className="relative z-10">
           <h1 className="text-4xl font-black text-stone-800 tracking-wide leading-none">
-            香港 <span className="text-white text-3xl inline-block drop-shadow-md ml-1 font-hand">Trip 2025</span>
+            香港 <span className="text-white text-3xl inline-block drop-shadow-md ml-1 font-hand">Trip 2025 ✨</span>
           </h1>
           <p className="text-stone-700 font-bold mt-2 ml-1 text-lg">Dec 12 - Dec 15</p>
         </div>
