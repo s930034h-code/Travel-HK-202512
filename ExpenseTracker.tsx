@@ -168,36 +168,36 @@ const ExpenseTracker: React.FC = () => {
          </div>
       </div>
 
-      {/* Add Expense Form */}
+      {/* Add Expense Form - Mobile Optimized */}
       <form onSubmit={addExpense} className="bg-white p-4 rounded-2xl border-2 border-stone-800 shadow-sketch space-y-3">
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <input 
             type="text" 
             placeholder="項目 (e.g. 雞蛋仔)" 
             value={newItem}
             onChange={(e) => setNewItem(e.target.value)}
-            className="flex-1 p-2 border-b-2 border-stone-300 focus:border-autumn-300 outline-none bg-transparent placeholder:text-stone-400 text-lg"
+            className="flex-1 min-w-0 p-3 bg-stone-50 rounded-xl border-2 border-stone-200 focus:border-autumn-300 outline-none text-stone-800 placeholder:text-stone-400 text-lg transition-colors"
           />
           <input 
             type="number" 
             placeholder="$" 
             value={newAmount}
             onChange={(e) => setNewAmount(e.target.value)}
-            className="w-20 p-2 border-b-2 border-stone-300 focus:border-autumn-300 outline-none bg-transparent text-lg text-center"
+            className="w-24 flex-shrink-0 p-3 bg-stone-50 rounded-xl border-2 border-stone-200 focus:border-autumn-300 outline-none text-lg text-center text-stone-800 transition-colors"
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <input 
              type="date"
              value={date}
              onChange={(e) => setDate(e.target.value)}
-             className="flex-1 p-2 bg-stone-100 rounded-lg text-sm text-stone-600 outline-none border border-transparent focus:border-autumn-300"
+             className="flex-1 min-w-0 p-3 bg-stone-50 rounded-xl border-2 border-stone-200 text-sm text-stone-800 outline-none focus:border-autumn-300 transition-colors"
           />
           <select 
               value={paymentMethod} 
               onChange={(e) => setPaymentMethod(e.target.value as any)}
-              className="flex-1 p-2 rounded-lg bg-stone-100 text-sm text-stone-600 outline-none"
+              className="flex-1 min-w-0 p-3 rounded-xl bg-stone-50 border-2 border-stone-200 text-sm text-stone-800 outline-none focus:border-autumn-300 transition-colors"
             >
               <option value="cash">現金 Cash</option>
               <option value="octopus">八達通</option>
@@ -206,11 +206,11 @@ const ExpenseTracker: React.FC = () => {
             </select>
         </div>
 
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-3 items-center">
             <select 
               value={category} 
               onChange={(e) => setCategory(e.target.value as any)}
-              className="p-2 rounded-lg bg-stone-100 text-sm w-1/3 outline-none"
+              className="w-1/3 min-w-[80px] p-3 rounded-xl bg-stone-50 border-2 border-stone-200 text-sm text-stone-800 outline-none focus:border-autumn-300 transition-colors"
             >
               <option value="food">美食</option>
               <option value="transport">交通</option>
@@ -219,9 +219,10 @@ const ExpenseTracker: React.FC = () => {
             </select>
             <button 
               type="submit" 
-              className="flex-1 bg-stone-800 text-white p-2 rounded-lg font-bold hover:bg-stone-700 transition-colors flex justify-center items-center gap-2 shadow-sm active:translate-y-0.5 active:shadow-none"
+              className="flex-1 bg-stone-800 text-white p-3 rounded-xl font-bold hover:bg-stone-700 transition-colors flex justify-center items-center gap-2 shadow-sm active:translate-y-0.5 active:shadow-none"
             >
-              <Plus className="w-4 h-4" /> 記帳
+              <Plus className="w-5 h-5" /> 
+              <span>記一筆</span>
             </button>
         </div>
       </form>
