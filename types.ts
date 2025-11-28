@@ -22,12 +22,12 @@ export interface DailyItinerary {
 export interface Expense {
   id: string;
   item: string;
-  amountHKD: number; // The calculated amount in HKD (if original was TWD, this is converted)
-  amountTWD: number; // The calculated amount in TWD (if original was HKD, this is converted)
-  originalAmount: number; // What the user typed
-  currency: 'HKD' | 'TWD'; // Currency of the original amount
+  originalAmount: number; // The amount typed by user
+  currency: 'HKD' | 'TWD'; // The currency typed by user
+  amountHKD?: number; // Optional: stored calculated value
+  amountTWD?: number; // Optional: stored calculated value
   paidBy: string; // Who paid
-  beneficiaries: string[]; // Who involves in this bill (for splitting)
+  beneficiaries: string[]; // Who is this bill for? (Array of names)
   category: 'food' | 'transport' | 'shopping' | 'other';
   date: string;
   paymentMethod: 'cash' | 'card' | 'applepay' | 'octopus';

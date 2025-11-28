@@ -49,6 +49,7 @@ const ExpenseTracker: React.FC = () => {
     const usersRef = ref(db, 'users');
     const configRef = ref(db, 'config');
     
+    // Expenses Listener
     const unsubExpenses = onValue(expensesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -56,8 +57,7 @@ const ExpenseTracker: React.FC = () => {
           id: key,
           ...value,
           currency: value.currency || 'HKD',
-          originalAmount: value.originalAmount || value.amountHKD,
-          amountTWD: value.amountTWD || (value.amountHKD * DEFAULT_RATE),
+          originalAmount: value.originalAmount || value.amountHKD || 0,
           beneficiaries: value.beneficiaries || []
         }));
         setExpenses(expenseList);
@@ -67,15 +67,18 @@ const ExpenseTracker: React.FC = () => {
       setIsOnline(true);
     }, (error) => setIsOnline(false));
 
+    // Users Listener
     const unsubUsers = onValue(usersRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
          const userList = Object.values(data) as string[];
          setUsers(userList);
+         // Set default payer if "Me" is not valid or just init
          if (userList.length > 0 && paidBy === 'Me') setPaidBy(userList[0]);
       }
     });
 
+    // Config (Exchange Rate) Listener
     const unsubConfig = onValue(configRef, (snapshot) => {
         const data = snapshot.val();
         if (data && data.exchangeRate) {
@@ -89,7 +92,7 @@ const ExpenseTracker: React.FC = () => {
     return () => { unsubExpenses(); unsubUsers(); unsubConfig(); };
   }, []);
 
-  // Update selected beneficiaries when users list changes
+  // Auto-select all beneficiaries when users list loads or changes if list was empty
   useEffect(() => {
       if (selectedBeneficiaries.length === 0 && users.length > 0) {
           setSelectedBeneficiaries(users);
@@ -98,7 +101,7 @@ const ExpenseTracker: React.FC = () => {
 
   const toggleBeneficiary = (user: string) => {
       if (selectedBeneficiaries.includes(user)) {
-          // Prevent deselecting if only 1 left
+          // Prevent deselecting if only 1 left (someone must pay)
           if (selectedBeneficiaries.length > 1) {
              setSelectedBeneficiaries(selectedBeneficiaries.filter(u => u !== user));
           }
@@ -115,8 +118,6 @@ const ExpenseTracker: React.FC = () => {
       if (rate > 0) {
           set(ref(db, 'config/exchangeRate'), rate);
           setShowRateModal(false);
-          // Recalculate all TWD amounts for display consistency could be done here, 
-          // but we calculate totals on the fly in render for simplicity.
       }
   };
 
@@ -130,24 +131,12 @@ const ExpenseTracker: React.FC = () => {
     }
 
     const amountVal = parseFloat(newAmount);
-    let amountHKD = 0;
-    let amountTWD = 0;
-
-    if (inputCurrency === 'HKD') {
-        amountHKD = amountVal;
-        amountTWD = amountVal * exchangeRate;
-    } else {
-        amountTWD = amountVal;
-        amountHKD = amountVal / exchangeRate;
-    }
-
+    
     // Default beneficiaries to everyone if somehow empty
     const finalBeneficiaries = selectedBeneficiaries.length > 0 ? selectedBeneficiaries : users;
 
     const newExpense: Omit<Expense, 'id'> = {
       item: newItem,
-      amountHKD: amountHKD,
-      amountTWD: amountTWD,
       originalAmount: amountVal,
       currency: inputCurrency,
       paidBy: paidBy,
@@ -172,10 +161,11 @@ const ExpenseTracker: React.FC = () => {
       const updatedUsers = [...users, newMemberName.trim()];
       set(ref(db, 'users'), updatedUsers);
       setNewMemberName('');
+      if (paidBy === 'Me') setPaidBy(newMemberName.trim());
   };
 
   const removeMember = (nameToRemove: string) => {
-      if (!confirm(`確定要刪除 ${nameToRemove} 嗎？`)) return;
+      if (!confirm(`確定要刪除 ${nameToRemove} 嗎？這可能會影響歷史帳務顯示。`)) return;
       const updatedUsers = users.filter(u => u !== nameToRemove);
       set(ref(db, 'users'), updatedUsers);
   };
@@ -190,11 +180,16 @@ const ExpenseTracker: React.FC = () => {
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Totals Calculation
-  const totalOriginalHKD = filteredExpenses.filter(e => e.currency === 'HKD').reduce((acc, curr) => acc + curr.originalAmount, 0);
-  const totalOriginalTWD = filteredExpenses.filter(e => e.currency === 'TWD').reduce((acc, curr) => acc + curr.originalAmount, 0);
+  // Totals Calculation (Separate HKD and TWD original amounts)
+  const totalOriginalHKD = filteredExpenses
+    .filter(e => e.currency === 'HKD')
+    .reduce((acc, curr) => acc + curr.originalAmount, 0);
+
+  const totalOriginalTWD = filteredExpenses
+    .filter(e => e.currency === 'TWD')
+    .reduce((acc, curr) => acc + curr.originalAmount, 0);
   
-  // Grand Total in TWD
+  // Grand Total in TWD (Live calculation based on current rate)
   const grandTotalTWD = totalOriginalTWD + (totalOriginalHKD * exchangeRate);
 
   // Settlement Logic (All converted to TWD for calculation)
@@ -204,7 +199,7 @@ const ExpenseTracker: React.FC = () => {
 
       // 1. Calculate Balances
       expenses.forEach(exp => {
-          // Normalize expense to TWD
+          // Normalize expense to TWD using CURRENT rate
           const amountInTWD = exp.currency === 'TWD' ? exp.originalAmount : (exp.originalAmount * exchangeRate);
           
           // Payer gets positive balance (they paid, so they are owed money)
@@ -213,12 +208,17 @@ const ExpenseTracker: React.FC = () => {
           }
 
           // Beneficiaries get negative balance (consumption)
-          const splitAmount = amountInTWD / (exp.beneficiaries?.length || 1);
-          exp.beneficiaries?.forEach(person => {
-              if (balances[person] !== undefined) {
-                  balances[person] -= splitAmount;
-              }
-          });
+          // Handle legacy data where beneficiaries might be missing
+          const involvedUsers = exp.beneficiaries && exp.beneficiaries.length > 0 ? exp.beneficiaries : users;
+          
+          if (involvedUsers.length > 0) {
+            const splitAmount = amountInTWD / involvedUsers.length;
+            involvedUsers.forEach(person => {
+                if (balances[person] !== undefined) {
+                    balances[person] -= splitAmount;
+                }
+            });
+          }
       });
 
       // 2. Separate into debtors and creditors
@@ -259,7 +259,7 @@ const ExpenseTracker: React.FC = () => {
 
   const settlementData = calculateSettlement();
 
-  // Chart Data
+  // Chart Data (Live conversion for consistent chart)
   const categoryData = [
     { name: '食', value: filteredExpenses.filter(e => e.category === 'food').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
     { name: '行', value: filteredExpenses.filter(e => e.category === 'transport').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
