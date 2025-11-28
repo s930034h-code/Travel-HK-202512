@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Expense } from './types';
 import { EXCHANGE_RATE } from './constants';
-import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X } from 'lucide-react';
+import { db } from './firebase';
+import { ref, push, onValue, remove } from 'firebase/database';
+import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X, CloudLightning } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const COLORS = ['#F08A5D', '#B83B5E', '#6A2C70', '#44403C'];
@@ -15,7 +17,6 @@ const PaymentIconMap = {
 
 const ExpenseTracker: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  // Removed showFilter toggle, we will show it by default or always
   
   // Form State
   const [newItem, setNewItem] = useState('');
@@ -27,28 +28,58 @@ const ExpenseTracker: React.FC = () => {
   // Filter State
   const [filterDate, setFilterDate] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [isOnline, setIsOnline] = useState(false);
+
+  // Sync with Firebase
+  useEffect(() => {
+    const expensesRef = ref(db, 'expenses');
+    
+    // Listen for data changes
+    const unsubscribe = onValue(expensesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        // Convert Firebase object to Array
+        const expenseList = Object.entries(data).map(([key, value]: [string, any]) => ({
+          id: key,
+          ...value
+        }));
+        setExpenses(expenseList);
+      } else {
+        setExpenses([]);
+      }
+      setIsOnline(true);
+    }, (error) => {
+      console.error("Firebase Read Error:", error);
+      setIsOnline(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const addExpense = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItem || !newAmount) return;
 
-    const expense: Expense = {
-      id: Date.now().toString(),
+    const newExpense = {
       item: newItem,
       amountHKD: parseFloat(newAmount),
       paidBy: 'Me',
       category,
       date,
-      paymentMethod
+      paymentMethod,
+      timestamp: Date.now() // For sorting
     };
 
-    setExpenses([expense, ...expenses]);
+    // Push to Firebase
+    push(ref(db, 'expenses'), newExpense);
+
     setNewItem('');
     setNewAmount('');
   };
 
   const removeExpense = (id: string) => {
-    setExpenses(expenses.filter(e => e.id !== id));
+    // Remove from Firebase
+    remove(ref(db, `expenses/${id}`));
   };
 
   // Filter and Sort Logic
@@ -74,11 +105,17 @@ const ExpenseTracker: React.FC = () => {
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4 pb-24">
       
-      {/* Search/Filter Bar - Always Visible */}
+      {/* Sync Status / Filter Bar */}
       <div className="bg-stone-100 rounded-xl border border-stone-200 p-3 shadow-inner">
-         <div className="flex items-center gap-2 mb-2">
-            <Search className="w-4 h-4 text-stone-500" />
-            <span className="text-sm font-bold text-stone-500">查詢紀錄</span>
+         <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-stone-500" />
+                <span className="text-sm font-bold text-stone-500">查詢紀錄</span>
+            </div>
+            <div className={`text-xs flex items-center gap-1 ${isOnline ? 'text-green-600' : 'text-stone-400'}`}>
+                <CloudLightning className="w-3 h-3" />
+                {isOnline ? '已同步' : '連線中...'}
+            </div>
          </div>
          <div className="flex gap-2">
              <input 
@@ -260,7 +297,7 @@ const ExpenseTracker: React.FC = () => {
           <div className="text-center text-stone-400 py-10 border-2 border-dashed border-stone-300 rounded-2xl bg-stone-50/50">
             <Calculator className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p className="font-hand text-xl">
-               {expenses.length === 0 ? '還沒有記帳紀錄喔' : '沒有符合查詢的紀錄'}
+               {expenses.length === 0 ? (isOnline ? '還沒有記帳紀錄喔' : '連線中...') : '沒有符合查詢的紀錄'}
             </p>
           </div>
         )}
