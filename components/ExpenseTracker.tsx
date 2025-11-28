@@ -7,7 +7,7 @@ import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphon
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const COLORS = ['#F08A5D', '#B83B5E', '#6A2C70', '#44403C'];
-const DEFAULT_RATE = 4.15;
+const DEFAULT_RATE = 4.15; // 預設匯率，會被 Firebase 設定覆蓋
 
 const PaymentIconMap = {
   cash: <Banknote className="w-3 h-3" />,
@@ -56,8 +56,8 @@ const ExpenseTracker: React.FC = () => {
         const expenseList = Object.entries(data).map(([key, value]: [string, any]) => ({
           id: key,
           ...value,
-          currency: value.currency || 'HKD',
-          originalAmount: value.originalAmount || value.amountHKD || 0,
+          currency: value.currency || 'HKD', // 兼容舊資料
+          originalAmount: value.originalAmount || value.amountHKD || 0, // 兼容舊資料
           beneficiaries: value.beneficiaries || []
         }));
         setExpenses(expenseList);
@@ -92,7 +92,7 @@ const ExpenseTracker: React.FC = () => {
     return () => { unsubExpenses(); unsubUsers(); unsubConfig(); };
   }, []);
 
-  // Auto-select all beneficiaries when users list loads or changes if list was empty
+  // 當使用者列表載入時，預設全選所有人分帳
   useEffect(() => {
       if (selectedBeneficiaries.length === 0 && users.length > 0) {
           setSelectedBeneficiaries(users);
@@ -101,7 +101,7 @@ const ExpenseTracker: React.FC = () => {
 
   const toggleBeneficiary = (user: string) => {
       if (selectedBeneficiaries.includes(user)) {
-          // Prevent deselecting if only 1 left (someone must pay)
+          // 至少要有一個人分帳
           if (selectedBeneficiaries.length > 1) {
              setSelectedBeneficiaries(selectedBeneficiaries.filter(u => u !== user));
           }
@@ -125,14 +125,14 @@ const ExpenseTracker: React.FC = () => {
     e.preventDefault();
     if (!newItem || !newAmount) return;
     if (users.length === 0) {
-        alert("請先新增成員才能記帳 (為了分帳功能)");
+        alert("請先點擊上方「成員」按鈕新增成員，才能使用記帳功能 (為了計算分帳)");
         setShowMemberModal(true);
         return;
     }
 
     const amountVal = parseFloat(newAmount);
     
-    // Default beneficiaries to everyone if somehow empty
+    // 如果沒有選分帳人，預設為所有人
     const finalBeneficiaries = selectedBeneficiaries.length > 0 ? selectedBeneficiaries : users;
 
     const newExpense: Omit<Expense, 'id'> = {
@@ -150,7 +150,7 @@ const ExpenseTracker: React.FC = () => {
     push(ref(db, 'expenses'), newExpense);
     setNewItem('');
     setNewAmount('');
-    setSelectedBeneficiaries(users); // Reset to all
+    setSelectedBeneficiaries(users); // 重置為全選
   };
 
   const removeExpense = (id: string) => remove(ref(db, `expenses/${id}`));
@@ -161,7 +161,8 @@ const ExpenseTracker: React.FC = () => {
       const updatedUsers = [...users, newMemberName.trim()];
       set(ref(db, 'users'), updatedUsers);
       setNewMemberName('');
-      if (paidBy === 'Me') setPaidBy(newMemberName.trim());
+      // 如果是第一個人，自動設為預設付款人
+      if (users.length === 0) setPaidBy(newMemberName.trim());
   };
 
   const removeMember = (nameToRemove: string) => {
@@ -180,7 +181,7 @@ const ExpenseTracker: React.FC = () => {
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Totals Calculation (Separate HKD and TWD original amounts)
+  // Totals Calculation (分開計算港幣和台幣的原始金額)
   const totalOriginalHKD = filteredExpenses
     .filter(e => e.currency === 'HKD')
     .reduce((acc, curr) => acc + curr.originalAmount, 0);
@@ -189,26 +190,26 @@ const ExpenseTracker: React.FC = () => {
     .filter(e => e.currency === 'TWD')
     .reduce((acc, curr) => acc + curr.originalAmount, 0);
   
-  // Grand Total in TWD (Live calculation based on current rate)
+  // Grand Total in TWD (根據當前匯率即時計算)
   const grandTotalTWD = totalOriginalTWD + (totalOriginalHKD * exchangeRate);
 
-  // Settlement Logic (All converted to TWD for calculation)
+  // Settlement Logic (所有金額轉為台幣計算)
   const calculateSettlement = () => {
       const balances: Record<string, number> = {};
       users.forEach(u => balances[u] = 0);
 
       // 1. Calculate Balances
       expenses.forEach(exp => {
-          // Normalize expense to TWD using CURRENT rate
+          // 將金額統一轉為台幣
           const amountInTWD = exp.currency === 'TWD' ? exp.originalAmount : (exp.originalAmount * exchangeRate);
           
-          // Payer gets positive balance (they paid, so they are owed money)
+          // 付款人 (Payer) 增加正餘額 (別人欠他錢)
           if (balances[exp.paidBy] !== undefined) {
               balances[exp.paidBy] += amountInTWD;
           }
 
-          // Beneficiaries get negative balance (consumption)
-          // Handle legacy data where beneficiaries might be missing
+          // 受益人 (Beneficiaries) 扣除負餘額 (消費)
+          // 處理舊資料可能沒有 beneficiaries 的情況
           const involvedUsers = exp.beneficiaries && exp.beneficiaries.length > 0 ? exp.beneficiaries : users;
           
           if (involvedUsers.length > 0) {
@@ -226,12 +227,12 @@ const ExpenseTracker: React.FC = () => {
       let creditors: { name: string, amount: number }[] = [];
 
       Object.entries(balances).forEach(([name, amount]) => {
-          if (amount < -0.1) debtors.push({ name, amount }); // Using 0.1 to avoid float errors
+          if (amount < -0.1) debtors.push({ name, amount }); // 避免浮點數誤差
           else if (amount > 0.1) creditors.push({ name, amount });
       });
 
-      debtors.sort((a, b) => a.amount - b.amount); // Ascending (most negative first)
-      creditors.sort((a, b) => b.amount - a.amount); // Descending (most positive first)
+      debtors.sort((a, b) => a.amount - b.amount); // 欠最多錢的排前面
+      creditors.sort((a, b) => b.amount - a.amount); // 被欠最多錢的排前面
 
       const transactions: { from: string, to: string, amount: number }[] = [];
 
@@ -243,6 +244,7 @@ const ExpenseTracker: React.FC = () => {
           const debtor = debtors[i];
           const creditor = creditors[j];
           
+          // 取兩者絕對值的最小值
           const amount = Math.min(Math.abs(debtor.amount), creditor.amount);
           
           transactions.push({ from: debtor.name, to: creditor.name, amount });
@@ -259,7 +261,7 @@ const ExpenseTracker: React.FC = () => {
 
   const settlementData = calculateSettlement();
 
-  // Chart Data (Live conversion for consistent chart)
+  // Chart Data (即時轉換匯率以繪圖)
   const categoryData = [
     { name: '食', value: filteredExpenses.filter(e => e.category === 'food').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
     { name: '行', value: filteredExpenses.filter(e => e.category === 'transport').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
