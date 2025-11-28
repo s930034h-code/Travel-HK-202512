@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
-import ItineraryView from './ItineraryView';
-import WeatherView from './WeatherView';
-import ExpenseTracker from './ExpenseTracker';
-import InfoView from './InfoView';
+import ItineraryView from './components/ItineraryView';
+import WeatherView from './components/WeatherView';
+import ExpenseTracker from './components/ExpenseTracker';
+import InfoView from './components/InfoView';
 import { CalendarDays, CloudSun, Wallet, Info } from 'lucide-react';
 
 const App: React.FC = () => {

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { WEATHER_DATA } from '../constants';
 import { Sun, Cloud, CloudRain, Droplets } from 'lucide-react';

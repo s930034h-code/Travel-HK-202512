@@ -7,7 +7,7 @@ import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphon
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const COLORS = ['#F08A5D', '#B83B5E', '#6A2C70', '#44403C'];
-const DEFAULT_RATE = 4.15; // 預設匯率，會被 Firebase 設定覆蓋
+const DEFAULT_RATE = 4.15; // 預設匯率
 
 const PaymentIconMap = {
   cash: <Banknote className="w-3 h-3" />,
@@ -56,8 +56,8 @@ const ExpenseTracker: React.FC = () => {
         const expenseList = Object.entries(data).map(([key, value]: [string, any]) => ({
           id: key,
           ...value,
-          currency: value.currency || 'HKD', // 兼容舊資料
-          originalAmount: value.originalAmount || value.amountHKD || 0, // 兼容舊資料
+          currency: value.currency || 'HKD', // 舊資料預設 HKD
+          originalAmount: value.originalAmount || value.amountHKD || 0, // 舊資料轉移
           beneficiaries: value.beneficiaries || []
         }));
         setExpenses(expenseList);
@@ -73,7 +73,7 @@ const ExpenseTracker: React.FC = () => {
       if (data) {
          const userList = Object.values(data) as string[];
          setUsers(userList);
-         // Set default payer if "Me" is not valid or just init
+         // 若當前付款人無效，重置為第一位
          if (userList.length > 0 && paidBy === 'Me') setPaidBy(userList[0]);
       }
     });
@@ -181,7 +181,7 @@ const ExpenseTracker: React.FC = () => {
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Totals Calculation (分開計算港幣和台幣的原始金額)
+  // Totals Calculation
   const totalOriginalHKD = filteredExpenses
     .filter(e => e.currency === 'HKD')
     .reduce((acc, curr) => acc + curr.originalAmount, 0);
@@ -190,26 +190,25 @@ const ExpenseTracker: React.FC = () => {
     .filter(e => e.currency === 'TWD')
     .reduce((acc, curr) => acc + curr.originalAmount, 0);
   
-  // Grand Total in TWD (根據當前匯率即時計算)
+  // Grand Total in TWD (動態匯率)
   const grandTotalTWD = totalOriginalTWD + (totalOriginalHKD * exchangeRate);
 
-  // Settlement Logic (所有金額轉為台幣計算)
+  // Settlement Logic (Splitwise 演算法)
   const calculateSettlement = () => {
       const balances: Record<string, number> = {};
       users.forEach(u => balances[u] = 0);
 
       // 1. Calculate Balances
       expenses.forEach(exp => {
-          // 將金額統一轉為台幣
+          // 統一轉為台幣計算
           const amountInTWD = exp.currency === 'TWD' ? exp.originalAmount : (exp.originalAmount * exchangeRate);
           
-          // 付款人 (Payer) 增加正餘額 (別人欠他錢)
+          // 付款人 + (債權)
           if (balances[exp.paidBy] !== undefined) {
               balances[exp.paidBy] += amountInTWD;
           }
 
-          // 受益人 (Beneficiaries) 扣除負餘額 (消費)
-          // 處理舊資料可能沒有 beneficiaries 的情況
+          // 分帳人 - (債務)
           const involvedUsers = exp.beneficiaries && exp.beneficiaries.length > 0 ? exp.beneficiaries : users;
           
           if (involvedUsers.length > 0) {
@@ -222,29 +221,28 @@ const ExpenseTracker: React.FC = () => {
           }
       });
 
-      // 2. Separate into debtors and creditors
+      // 2. Separate Debtors / Creditors
       let debtors: { name: string, amount: number }[] = [];
       let creditors: { name: string, amount: number }[] = [];
 
       Object.entries(balances).forEach(([name, amount]) => {
-          if (amount < -0.1) debtors.push({ name, amount }); // 避免浮點數誤差
+          if (amount < -0.1) debtors.push({ name, amount }); 
           else if (amount > 0.1) creditors.push({ name, amount });
       });
 
-      debtors.sort((a, b) => a.amount - b.amount); // 欠最多錢的排前面
-      creditors.sort((a, b) => b.amount - a.amount); // 被欠最多錢的排前面
+      debtors.sort((a, b) => a.amount - b.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
 
       const transactions: { from: string, to: string, amount: number }[] = [];
 
-      // 3. Match debts
-      let i = 0; // debtor index
-      let j = 0; // creditor index
+      // 3. Match
+      let i = 0; 
+      let j = 0; 
 
       while (i < debtors.length && j < creditors.length) {
           const debtor = debtors[i];
           const creditor = creditors[j];
           
-          // 取兩者絕對值的最小值
           const amount = Math.min(Math.abs(debtor.amount), creditor.amount);
           
           transactions.push({ from: debtor.name, to: creditor.name, amount });
@@ -261,7 +259,7 @@ const ExpenseTracker: React.FC = () => {
 
   const settlementData = calculateSettlement();
 
-  // Chart Data (即時轉換匯率以繪圖)
+  // Chart Data
   const categoryData = [
     { name: '食', value: filteredExpenses.filter(e => e.category === 'food').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
     { name: '行', value: filteredExpenses.filter(e => e.category === 'transport').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
@@ -271,7 +269,7 @@ const ExpenseTracker: React.FC = () => {
 
 
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-4 pb-24 relative">
+    <div className="h-full overflow-y-auto p-4 space-y-4 pb-24 relative animate-fadeIn">
       
       {/* Top Tabs */}
       <div className="flex bg-stone-200 p-1 rounded-xl mb-2">

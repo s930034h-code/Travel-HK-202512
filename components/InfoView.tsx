@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { GENERAL_INFO } from '../constants';
 import { Plane, Home, Lightbulb, Info, Map } from 'lucide-react';
