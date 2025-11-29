@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GENERAL_INFO } from '../constants';
-import { Plane, Home, Lightbulb, Info, Map, FileText } from 'lucide-react';
+import { Plane, Home, Lightbulb, Info, Map } from 'lucide-react';
 
 type InfoTab = 'flight' | 'hotel' | 'tips' | 'code';
 
@@ -207,23 +207,10 @@ const InfoView: React.FC = () => {
                         href={GENERAL_INFO.accommodation.googleMapLink} 
                         target="_blank" 
                         rel="noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 bg-stone-800 text-white py-2.5 rounded-xl font-bold hover:bg-stone-700 transition-colors shadow-sm text-sm"
+                        className="w-full flex items-center justify-center gap-2 bg-stone-800 text-white py-2.5 rounded-xl font-bold hover:bg-stone-700 transition-colors shadow-sm text-sm"
                       >
                           <Map className="w-4 h-4" />
                           <span>Google Map</span>
-                      </a>
-                      
-                      {/* PDF Download Button */}
-                      {/* Note: User must place 'booking.pdf' in the public folder */}
-                      <a 
-                        href="./booking.pdf" 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download="booking.pdf"
-                        className="flex-1 flex items-center justify-center gap-2 bg-autumn-100 text-autumn-600 border-2 border-autumn-200 py-2.5 rounded-xl font-bold hover:bg-autumn-200 transition-colors shadow-sm text-sm"
-                      >
-                          <FileText className="w-4 h-4" />
-                          <span>Booking 訂單</span>
                       </a>
                    </div>
 
