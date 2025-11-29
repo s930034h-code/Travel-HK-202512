@@ -1,9 +1,101 @@
 
 import React, { useState } from 'react';
 import { GENERAL_INFO } from '../constants';
-import { Plane, Home, Lightbulb, Info, Map } from 'lucide-react';
+import { Plane, Home, Lightbulb, Info, Map, FileText } from 'lucide-react';
 
 type InfoTab = 'flight' | 'hotel' | 'tips' | 'code';
+
+// 登機證組件
+const BoardingPass: React.FC<{
+  type: 'Outbound' | 'Inbound';
+  flightNo: string;
+  date: string;
+  fromCode: string;
+  toCode: string;
+  depTime: string;
+  arrTime: string;
+  terminal: string;
+}> = ({ type, flightNo, date, fromCode, toCode, depTime, arrTime, terminal }) => {
+  return (
+    <div className="bg-white rounded-3xl border-2 border-stone-800 shadow-sketch relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+      {/* Top Section: Main Info */}
+      <div className="p-5 pb-6 bg-white relative z-10">
+        
+        {/* Header: Logo & Tag */}
+        <div className="flex justify-between items-center mb-4">
+           {/* Cathay Logo - Smaller and Left Aligned */}
+           <img 
+              src="https://upload.wikimedia.org/wikipedia/en/thumb/1/17/Cathay_Pacific_logo.svg/300px-Cathay_Pacific_logo.svg.png" 
+              alt="Cathay Pacific" 
+              className="h-6 w-auto object-contain" 
+           />
+           
+           <div className="bg-autumn-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shadow-sm">
+             {type}
+           </div>
+        </div>
+
+        {/* Date + Flight No - Bold & Larger */}
+        <div className="mb-5 border-b-2 border-dashed border-stone-100 pb-4">
+           <div className="text-2xl font-black text-stone-800 leading-tight">
+              {date} <span className="text-autumn-500 whitespace-nowrap">- {flightNo}</span>
+           </div>
+        </div>
+
+        {/* Route Info */}
+        <div className="flex justify-between items-center px-1">
+          <div className="text-center">
+            <div className="text-4xl font-black text-stone-800 font-sans tracking-wider">{fromCode}</div>
+            <div className="text-xl font-bold text-stone-500 mt-1">{depTime}</div>
+          </div>
+          
+          <div className="flex-1 px-4 flex flex-col items-center">
+             <div className="w-full h-0.5 bg-stone-300 relative">
+               <Plane className="w-5 h-5 text-autumn-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-1 transform rotate-90" />
+             </div>
+             <div className="text-xs text-stone-400 mt-2 font-sans">2h 10m</div>
+          </div>
+
+          <div className="text-center">
+            <div className="text-4xl font-black text-stone-800 font-sans tracking-wider">{toCode}</div>
+            <div className="text-xl font-bold text-stone-500 mt-1">{arrTime}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Divider with Cutouts */}
+      <div className="relative h-6 bg-stone-50 border-t-2 border-dashed border-stone-300 flex items-center justify-between">
+        <div className="w-4 h-4 bg-paper rounded-full border-r-2 border-stone-300 absolute -left-2 top-1/2 -translate-y-1/2"></div>
+        <div className="w-4 h-4 bg-paper rounded-full border-l-2 border-stone-300 absolute -right-2 top-1/2 -translate-y-1/2"></div>
+      </div>
+
+      {/* Bottom Section: Footer Info */}
+      <div className="bg-stone-50 p-4 pt-2 flex justify-between items-end border-t-0">
+         <div className="flex gap-4">
+            <div>
+              <span className="text-[10px] text-stone-400 uppercase font-bold block">Terminal</span>
+              <span className="text-lg font-bold text-stone-800">{terminal}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-stone-400 uppercase font-bold block">Gate</span>
+              <span className="text-lg font-bold text-stone-800">--</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-stone-400 uppercase font-bold block">Seat</span>
+              <span className="text-lg font-bold text-stone-800">--</span>
+            </div>
+         </div>
+         
+         {/* Fake Barcode */}
+         <div className="h-8 flex items-end gap-[2px] opacity-60">
+            {[...Array(15)].map((_,i) => (
+              <div key={i} className={`bg-stone-800 h-full ${i%2===0 ? 'w-1' : 'w-0.5'}`}></div>
+            ))}
+         </div>
+      </div>
+    </div>
+  );
+};
 
 const InfoView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<InfoTab>('flight');
@@ -43,33 +135,35 @@ const InfoView: React.FC = () => {
         
         {/* Flight Content */}
         {activeTab === 'flight' && (
-          <div className="space-y-4 animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn">
             <h2 className="text-2xl font-bold text-stone-800 border-l-4 border-autumn-300 pl-3">航班資訊</h2>
-            <div className="bg-white p-5 rounded-2xl border-2 border-stone-800 shadow-sketch relative">
-              <div className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="bg-stone-100 p-2 rounded-full">
-                     <Plane className="w-6 h-6 text-stone-800" />
-                  </div>
-                  <div>
-                    <div className="text-sm text-stone-500 font-bold mb-1">去程 Outbound</div>
-                    <div className="font-bold text-stone-800 text-lg leading-relaxed">{GENERAL_INFO.flights.outbound}</div>
-                  </div>
-                </div>
-                <div className="border-t-2 border-dashed border-stone-200"></div>
-                <div className="flex items-start gap-4">
-                  <div className="bg-stone-100 p-2 rounded-full">
-                     <Plane className="w-6 h-6 text-stone-800 transform rotate-180" />
-                  </div>
-                  <div>
-                    <div className="text-sm text-stone-500 font-bold mb-1">回程 Inbound</div>
-                    <div className="font-bold text-stone-800 text-lg leading-relaxed">{GENERAL_INFO.flights.inbound}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-autumn-100 p-4 rounded-xl border border-autumn-300 text-stone-700 text-sm">
-                請務必提早 2.5 小時抵達機場辦理登機手續。
+            
+            {/* Outbound */}
+            <BoardingPass 
+              type="Outbound"
+              flightNo="CX407"
+              date="2025 Dec 12"
+              fromCode="TPE"
+              toCode="HKG"
+              depTime="08:20"
+              arrTime="10:30"
+              terminal="T1"
+            />
+
+            {/* Inbound */}
+            <BoardingPass 
+              type="Inbound"
+              flightNo="CX402"
+              date="2025 Dec 15"
+              fromCode="HKG"
+              toCode="TPE"
+              depTime="18:30"
+              arrTime="20:15"
+              terminal="T1"
+            />
+            
+            <div className="bg-stone-100 p-3 rounded-xl border border-stone-200 text-stone-500 text-xs text-center">
+                請務必於起飛前 2.5 小時抵達機場辦理登機手續
             </div>
           </div>
         )}
@@ -78,28 +172,69 @@ const InfoView: React.FC = () => {
         {activeTab === 'hotel' && (
           <div className="space-y-4 animate-fadeIn">
              <h2 className="text-2xl font-bold text-stone-800 border-l-4 border-autumn-400 pl-3">住宿資訊</h2>
-             <div className="bg-white p-6 rounded-2xl border-2 border-stone-800 shadow-sketch text-center">
-                <div className="w-16 h-16 bg-autumn-100 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-stone-800">
-                    <Home className="w-8 h-8 text-autumn-500" />
+             
+             {/* Hotel Card */}
+             <div className="bg-white p-0 rounded-3xl border-2 border-stone-800 shadow-sketch overflow-hidden">
+                {/* Hotel Image with Fallback */}
+                <div className="h-48 w-full bg-stone-300 relative flex items-center justify-center overflow-hidden">
+                   {/* Fallback Icon (Behind image, visible if image loads transparently or fails) */}
+                   <div className="absolute inset-0 flex items-center justify-center">
+                      <Home className="w-12 h-12 text-stone-400 opacity-50" />
+                   </div>
+                   
+                   <img 
+                      src={GENERAL_INFO.accommodation.imageUrl} 
+                      alt="The Cityview Hotel" 
+                      className="w-full h-full object-cover relative z-10"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                   />
+                   
+                   {/* Gradient Overlay */}
+                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4 z-20">
+                      <div className="text-white">
+                         <h3 className="text-2xl font-bold leading-none">{GENERAL_INFO.accommodation.name}</h3>
+                         <h4 className="text-sm font-sans opacity-90">{GENERAL_INFO.accommodation.enName}</h4>
+                      </div>
+                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-stone-800 mb-1">{GENERAL_INFO.accommodation.name}</h3>
-                <h4 className="text-lg text-stone-600 font-sans mb-4">{GENERAL_INFO.accommodation.enName}</h4>
-                <div className="inline-block bg-stone-100 px-4 py-2 rounded-lg text-stone-700 font-bold border border-stone-300">
-                   📍 {GENERAL_INFO.accommodation.location}
-                </div>
-                <p className="mt-6 text-stone-500 text-sm">
-                    {GENERAL_INFO.accommodation.description}
-                </p>
-                <div className="mt-6 pt-4 border-t border-stone-200">
-                    <a 
-                      href={GENERAL_INFO.accommodation.googleMapLink} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 bg-stone-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-stone-700 transition-colors shadow-sm"
-                    >
-                        <Map className="w-4 h-4" />
-                        <span>在 Google Maps 上查看</span>
-                    </a>
+
+                <div className="p-5">
+                   {/* Actions */}
+                   <div className="flex gap-2 mb-4">
+                      <a 
+                        href={GENERAL_INFO.accommodation.googleMapLink} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 bg-stone-800 text-white py-2.5 rounded-xl font-bold hover:bg-stone-700 transition-colors shadow-sm text-sm"
+                      >
+                          <Map className="w-4 h-4" />
+                          <span>Google Map</span>
+                      </a>
+                      
+                      {/* PDF Download Button */}
+                      {/* Note: User must place 'booking.pdf' in the public folder */}
+                      <a 
+                        href="/booking.pdf" 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 bg-autumn-100 text-autumn-600 border-2 border-autumn-200 py-2.5 rounded-xl font-bold hover:bg-autumn-200 transition-colors shadow-sm text-sm"
+                      >
+                          <FileText className="w-4 h-4" />
+                          <span>Booking 訂單</span>
+                      </a>
+                   </div>
+
+                   <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+                      <div className="flex items-start gap-2 mb-2">
+                         <Map className="w-4 h-4 text-autumn-400 mt-1 flex-shrink-0" />
+                         <span className="text-stone-700 font-bold">{GENERAL_INFO.accommodation.location}</span>
+                      </div>
+                      <p className="text-stone-500 text-sm leading-relaxed whitespace-pre-line">
+                          {GENERAL_INFO.accommodation.description}
+                      </p>
+                   </div>
                 </div>
              </div>
           </div>

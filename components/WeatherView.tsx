@@ -30,15 +30,15 @@ const WeatherIconDisplay: React.FC<{ iconCode: number; altText: string }> = ({ i
 
   // 當圖片載入失敗時 (例如使用者還沒放圖片進去)，呼叫此函式切換為向量圖
   const handleImageError = () => {
-    console.warn(`[WeatherIcon] 無法讀取圖片: ${imagePath}，切換為備用圖示。`);
+    console.warn(`[WeatherIcon] 無法讀取圖片: ${imagePath} (Code: ${iconCode})，切換為備用圖示。`);
     setImageError(true);
   };
 
   // 用於除錯：確認是否有收到 iconCode
   useEffect(() => {
     if (iconCode) {
-      // 如果您在 Console 看到這個，代表程式碼有收到 API 的代碼，問題出在圖片路徑
-      // console.log(`[WeatherIcon] 嘗試讀取: ${imagePath}`);
+      // 這裡解除註解，方便您在 F12 Console 查看
+      console.log(`[WeatherIcon] 嘗試讀取: ${imagePath}`);
     }
   }, [iconCode, imagePath]);
 
@@ -153,7 +153,6 @@ const WeatherView: React.FC = () => {
         <div>
            <h2 className="text-2xl font-black text-stone-800 flex items-center gap-2">
              香港即時預報
-             <span className="text-[10px] bg-stone-800 text-white px-1.5 py-0.5 rounded font-sans font-normal">LIVE</span>
            </h2>
            <p className="text-xs text-stone-500 mt-1">資料來源：香港天文台 (HKO)</p>
         </div>
@@ -226,6 +225,10 @@ const WeatherView: React.FC = () => {
                     iconCode={day.ForecastIcon} 
                     altText={day.forecastWeather} 
                   />
+                  {/* 除錯顯示：直接把 Code 顯示出來，方便對照檔名 */}
+                  <span className="text-[10px] text-stone-400 font-mono mt-1">
+                    Code:{day.ForecastIcon}
+                  </span>
                 </div>
               </div>
             );

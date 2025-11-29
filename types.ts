@@ -27,7 +27,12 @@ export interface Expense {
   amountHKD?: number; // 計算後的港幣 (舊資料相容)
   amountTWD?: number; // 計算後的台幣 (舊資料相容)
   paidBy: string; // 誰付的錢
-  beneficiaries: string[]; // 這筆錢是幫誰付的 (分帳用)
+  beneficiaries: string[]; // 這筆錢是幫誰付的 (分帳用 - 用於平分模式)
+  
+  // New fields for exact split
+  splitType?: 'equal' | 'exact'; 
+  splitAmounts?: Record<string, number>; // key: username, value: amount in original currency
+
   category: 'food' | 'transport' | 'shopping' | 'other';
   date: string;
   paymentMethod: 'cash' | 'card' | 'applepay' | 'octopus';
@@ -53,6 +58,7 @@ export interface GeneralInfo {
     location: string;
     description: string;
     googleMapLink: string;
+    imageUrl: string; // 新增圖片欄位
   };
   tips: string[];
 }

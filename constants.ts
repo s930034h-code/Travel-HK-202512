@@ -1,3 +1,4 @@
+
 import { DailyItinerary, GeneralInfo, WeatherForecast } from './types';
 
 export const EXCHANGE_RATE = 4.15;
@@ -382,9 +383,11 @@ export const GENERAL_INFO: GeneralInfo = {
   accommodation: {
     name: '城景國際',
     enName: 'The Cityview',
-    location: '油麻地站',
-    description: '位於九龍市中心，交通極為便利。距離地鐵站步行僅需數分鐘。',
-    googleMapLink: 'https://www.google.com/maps/search/?api=1&query=The+Cityview+Hong+Kong'
+    location: '地鐵油麻地站',
+    description: '位於九龍市中心，交通極為便利。\n距離油麻地站D出口步行僅需約3分鐘。',
+    googleMapLink: 'https://www.google.com/maps/search/?api=1&query=The+Cityview+Hong+Kong',
+    // 指向 public 資料夾中的 hotel.jpg
+    imageUrl: '/hotel.jpg' 
   },
   tips: [
     '電壓 220V/50Hz，英式三腳 (Type G)，記得帶轉接頭。',

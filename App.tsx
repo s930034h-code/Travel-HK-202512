@@ -104,10 +104,10 @@ const NavButton: React.FC<{
         : 'text-stone-400 hover:text-stone-600'
     }`}
   >
-    <div className={`${active ? 'scale-110' : 'scale-100'} transition-transform`}>
+    <div className={`${active ? 'scale-110' : 'scale-100'} transition-transform mb-0.5`}>
       {React.cloneElement(icon as React.ReactElement<any>, { size: 24, strokeWidth: active ? 3 : 2 })}
     </div>
-    <span className={`text-xs font-bold mt-1 ${active ? 'opacity-100' : 'opacity-0'} transition-opacity absolute bottom-1`}>
+    <span className={`text-xs font-bold mt-1 ${active ? 'opacity-100' : 'opacity-0'} transition-opacity`}>
       {label}
     </span>
   </button>

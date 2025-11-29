@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Expense } from '../types';
 import { db } from '../firebase';
 import { ref, push, onValue, remove, set } from 'firebase/database';
-import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X, CloudLightning, Users, Settings, ArrowRightLeft, Check, TrendingUp, HandCoins } from 'lucide-react';
+import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X, CloudLightning, Users, Settings, ArrowRightLeft, Check, TrendingUp, HandCoins, Divide, MousePointer2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const COLORS = ['#F08A5D', '#B83B5E', '#6A2C70', '#44403C'];
@@ -30,7 +30,11 @@ const ExpenseTracker: React.FC = () => {
   const [date, setDate] = useState('2025-12-12');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'applepay' | 'octopus'>('cash');
   const [paidBy, setPaidBy] = useState<string>('Me');
+  
+  // Split Logic State
+  const [splitType, setSplitType] = useState<'equal' | 'exact'>('equal');
   const [selectedBeneficiaries, setSelectedBeneficiaries] = useState<string[]>([]);
+  const [exactSplitAmounts, setExactSplitAmounts] = useState<Record<string, string>>({}); // Use string for input handling
 
   // UI State
   const [showMemberModal, setShowMemberModal] = useState(false);
@@ -58,7 +62,9 @@ const ExpenseTracker: React.FC = () => {
           ...value,
           currency: value.currency || 'HKD', // 舊資料預設 HKD
           originalAmount: value.originalAmount || value.amountHKD || 0, // 舊資料轉移
-          beneficiaries: value.beneficiaries || []
+          beneficiaries: value.beneficiaries || [],
+          splitType: value.splitType || 'equal',
+          splitAmounts: value.splitAmounts || {}
         }));
         setExpenses(expenseList);
       } else {
@@ -78,7 +84,7 @@ const ExpenseTracker: React.FC = () => {
              setPaidBy(userList[0]);
          }
       } else {
-         // Fix: Handle empty data (when last user is deleted)
+         // Fix: Handle empty data
          setUsers([]);
          setPaidBy('Me');
       }
@@ -98,16 +104,27 @@ const ExpenseTracker: React.FC = () => {
     return () => { unsubExpenses(); unsubUsers(); unsubConfig(); };
   }, [paidBy]);
 
-  // 當使用者列表載入時，預設全選所有人分帳
+  // 當使用者列表載入時，預設全選所有人分帳 (Equal mode) & Init Exact mode amounts
   useEffect(() => {
-      if (selectedBeneficiaries.length === 0 && users.length > 0) {
-          setSelectedBeneficiaries(users);
+      if (users.length > 0) {
+        if (selectedBeneficiaries.length === 0) {
+            setSelectedBeneficiaries(users);
+        }
+        
+        // Init exact amounts with 0 or equal split? 0 is safer for "Exact" input
+        setExactSplitAmounts(prev => {
+            const newMap = { ...prev };
+            users.forEach(u => {
+                if (newMap[u] === undefined) newMap[u] = '';
+            });
+            return newMap;
+        });
       }
   }, [users]);
 
+  // Handle Equal Split Toggle
   const toggleBeneficiary = (user: string) => {
       if (selectedBeneficiaries.includes(user)) {
-          // 至少要有一個人分帳
           if (selectedBeneficiaries.length > 1) {
              setSelectedBeneficiaries(selectedBeneficiaries.filter(u => u !== user));
           }
@@ -117,6 +134,11 @@ const ExpenseTracker: React.FC = () => {
   };
 
   const selectAllBeneficiaries = () => setSelectedBeneficiaries(users);
+
+  // Handle Exact Split Input
+  const handleExactAmountChange = (user: string, value: string) => {
+      setExactSplitAmounts(prev => ({ ...prev, [user]: value }));
+  };
 
   const updateExchangeRate = (e: React.FormEvent) => {
       e.preventDefault();
@@ -137,9 +159,29 @@ const ExpenseTracker: React.FC = () => {
     }
 
     const amountVal = parseFloat(newAmount);
+
+    let finalSplitAmounts: Record<string, number> = {};
     
-    // 如果沒有選分帳人，預設為所有人
-    const finalBeneficiaries = selectedBeneficiaries.length > 0 ? selectedBeneficiaries : users;
+    if (splitType === 'exact') {
+        // Validation for exact split
+        let totalExact = 0;
+        users.forEach(u => {
+            const val = parseFloat(exactSplitAmounts[u] || '0');
+            finalSplitAmounts[u] = val;
+            totalExact += val;
+        });
+
+        // Allow a small margin of error for floating point, but basically should match
+        if (Math.abs(totalExact - amountVal) > 0.5) {
+            alert(`分帳總額 (${totalExact}) 與 消費總額 (${amountVal}) 不符，請檢查金額。`);
+            return;
+        }
+    }
+
+    // Determine beneficiaries for record
+    const finalBeneficiaries = splitType === 'equal' 
+        ? (selectedBeneficiaries.length > 0 ? selectedBeneficiaries : users)
+        : users.filter(u => (finalSplitAmounts[u] || 0) > 0);
 
     const newExpense: Omit<Expense, 'id'> = {
       item: newItem,
@@ -147,6 +189,8 @@ const ExpenseTracker: React.FC = () => {
       currency: inputCurrency,
       paidBy: paidBy,
       beneficiaries: finalBeneficiaries,
+      splitType,
+      splitAmounts: splitType === 'exact' ? finalSplitAmounts : undefined,
       category,
       date,
       paymentMethod,
@@ -154,9 +198,13 @@ const ExpenseTracker: React.FC = () => {
     };
 
     push(ref(db, 'expenses'), newExpense);
+    
+    // Reset Form
     setNewItem('');
     setNewAmount('');
-    setSelectedBeneficiaries(users); // 重置為全選
+    // Keep split settings or reset? Resetting exact amounts is safer
+    setExactSplitAmounts(users.reduce((acc, u) => ({...acc, [u]: ''}), {}));
+    // We don't reset selectedBeneficiaries to be nice
   };
 
   const removeExpense = (id: string) => remove(ref(db, `expenses/${id}`));
@@ -167,7 +215,6 @@ const ExpenseTracker: React.FC = () => {
       const updatedUsers = [...users, newMemberName.trim()];
       set(ref(db, 'users'), updatedUsers);
       setNewMemberName('');
-      // 如果是第一個人，自動設為預設付款人
       if (users.length === 0) setPaidBy(newMemberName.trim());
   };
 
@@ -187,7 +234,6 @@ const ExpenseTracker: React.FC = () => {
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Totals Calculation
   const totalOriginalHKD = filteredExpenses
     .filter(e => e.currency === 'HKD')
     .reduce((acc, curr) => acc + curr.originalAmount, 0);
@@ -196,7 +242,6 @@ const ExpenseTracker: React.FC = () => {
     .filter(e => e.currency === 'TWD')
     .reduce((acc, curr) => acc + curr.originalAmount, 0);
   
-  // Grand Total in TWD (動態匯率)
   const grandTotalTWD = totalOriginalTWD + (totalOriginalHKD * exchangeRate);
 
   // Settlement Logic (Splitwise 演算法)
@@ -204,30 +249,38 @@ const ExpenseTracker: React.FC = () => {
       const balances: Record<string, number> = {};
       users.forEach(u => balances[u] = 0);
 
-      // 1. Calculate Balances
       expenses.forEach(exp => {
-          // 統一轉為台幣計算
           const amountInTWD = exp.currency === 'TWD' ? exp.originalAmount : (exp.originalAmount * exchangeRate);
           
-          // 付款人 + (債權)
+          // 1. Payer gets positive balance (Creditor)
           if (balances[exp.paidBy] !== undefined) {
               balances[exp.paidBy] += amountInTWD;
           }
 
-          // 分帳人 - (債務)
-          const involvedUsers = exp.beneficiaries && exp.beneficiaries.length > 0 ? exp.beneficiaries : users;
-          
-          if (involvedUsers.length > 0) {
-            const splitAmount = amountInTWD / involvedUsers.length;
-            involvedUsers.forEach(person => {
-                if (balances[person] !== undefined) {
-                    balances[person] -= splitAmount;
-                }
-            });
+          // 2. Beneficiaries get negative balance (Debtor)
+          if (exp.splitType === 'exact' && exp.splitAmounts) {
+              // Exact Split Logic
+              Object.entries(exp.splitAmounts).forEach(([person, amount]) => {
+                  if (balances[person] !== undefined) {
+                      const shareInTWD = exp.currency === 'TWD' ? amount : (amount * exchangeRate);
+                      balances[person] -= shareInTWD;
+                  }
+              });
+          } else {
+              // Equal Split Logic (Default)
+              const involvedUsers = exp.beneficiaries && exp.beneficiaries.length > 0 ? exp.beneficiaries : users;
+              if (involvedUsers.length > 0) {
+                const splitAmount = amountInTWD / involvedUsers.length;
+                involvedUsers.forEach(person => {
+                    if (balances[person] !== undefined) {
+                        balances[person] -= splitAmount;
+                    }
+                });
+              }
           }
       });
 
-      // 2. Separate Debtors / Creditors
+      // Separate Debtors / Creditors
       let debtors: { name: string, amount: number }[] = [];
       let creditors: { name: string, amount: number }[] = [];
 
@@ -241,7 +294,6 @@ const ExpenseTracker: React.FC = () => {
 
       const transactions: { from: string, to: string, amount: number }[] = [];
 
-      // 3. Match
       let i = 0; 
       let j = 0; 
 
@@ -265,13 +317,17 @@ const ExpenseTracker: React.FC = () => {
 
   const settlementData = calculateSettlement();
 
-  // Chart Data
   const categoryData = [
     { name: '食', value: filteredExpenses.filter(e => e.category === 'food').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
     { name: '行', value: filteredExpenses.filter(e => e.category === 'transport').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
     { name: '購', value: filteredExpenses.filter(e => e.category === 'shopping').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
     { name: '雜', value: filteredExpenses.filter(e => e.category === 'other').reduce((a,c) => a + (c.currency === 'HKD' ? c.originalAmount * exchangeRate : c.originalAmount), 0) },
   ].filter(d => d.value > 0);
+
+  // Helper calculation for exact split remaining amount
+  const exactSplitSum = Object.values(exactSplitAmounts).reduce((a, b) => a + (parseFloat(b) || 0), 0);
+  const currentTotal = parseFloat(newAmount) || 0;
+  const remainingSplit = currentTotal - exactSplitSum;
 
 
   return (
@@ -431,15 +487,12 @@ const ExpenseTracker: React.FC = () => {
 
             {/* Payer Selection */}
             <div className="space-y-1">
-                <div className="text-xs text-stone-400 font-bold ml-1">誰付錢?</div>
+                <div className="text-xs text-stone-400 font-bold ml-1">誰付錢? (Payer)</div>
                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                     {users.length === 0 && (
                         <button type="button" onClick={() => setShowMemberModal(true)} className="flex-shrink-0 px-3 py-1.5 rounded-full border border-dashed border-stone-400 text-stone-500 text-xs font-bold flex items-center gap-1">
                             <Plus className="w-3 h-3" /> 新增成員
                         </button>
-                    )}
-                    {users.length === 0 && (
-                        <button type="button" className="flex-shrink-0 px-3 py-1.5 rounded-full border-2 text-xs font-bold bg-stone-800 text-white border-stone-800">Me</button>
                     )}
                     {users.map(u => (
                         <button
@@ -458,30 +511,84 @@ const ExpenseTracker: React.FC = () => {
                 </div>
             </div>
 
-            {/* Split Selection */}
+            {/* Split Section (Updated) */}
             {users.length > 0 && (
-                <div className="space-y-1 bg-stone-50 p-2 rounded-xl border border-stone-100">
+                <div className="space-y-2 bg-stone-50 p-2.5 rounded-xl border border-stone-100">
+                    {/* Split Type Toggles */}
                     <div className="flex justify-between items-center mb-1">
-                        <div className="text-xs text-stone-400 font-bold ml-1">幫誰付? (分給誰)</div>
-                        <button type="button" onClick={selectAllBeneficiaries} className="text-[10px] text-autumn-400 font-bold underline">全選</button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {users.map(u => (
+                        <div className="text-xs text-stone-400 font-bold ml-1">分給誰? (Split)</div>
+                        <div className="bg-stone-200 p-0.5 rounded-lg flex text-[10px] font-bold">
                             <button
-                                key={`split-${u}`}
                                 type="button"
-                                onClick={() => toggleBeneficiary(u)}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold border transition-all ${
-                                    selectedBeneficiaries.includes(u)
-                                    ? 'bg-autumn-100 text-autumn-500 border-autumn-300'
-                                    : 'bg-white text-stone-400 border-stone-200'
-                                }`}
+                                onClick={() => setSplitType('equal')}
+                                className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 ${splitType === 'equal' ? 'bg-white text-stone-800 shadow' : 'text-stone-500'}`}
                             >
-                                {selectedBeneficiaries.includes(u) && <Check className="w-3 h-3" />}
-                                {u}
+                                <Divide className="w-3 h-3" /> 平分
                             </button>
-                        ))}
+                            <button
+                                type="button"
+                                onClick={() => setSplitType('exact')}
+                                className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 ${splitType === 'exact' ? 'bg-white text-stone-800 shadow' : 'text-stone-500'}`}
+                            >
+                                <MousePointer2 className="w-3 h-3" /> 自訂
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Equal Split UI */}
+                    {splitType === 'equal' && (
+                        <div className="space-y-1">
+                            <div className="flex justify-end mb-1">
+                                <button type="button" onClick={selectAllBeneficiaries} className="text-[10px] text-autumn-400 font-bold underline">全選</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {users.map(u => (
+                                    <button
+                                        key={`split-equal-${u}`}
+                                        type="button"
+                                        onClick={() => toggleBeneficiary(u)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold border transition-all ${
+                                            selectedBeneficiaries.includes(u)
+                                            ? 'bg-autumn-100 text-autumn-500 border-autumn-300'
+                                            : 'bg-white text-stone-400 border-stone-200'
+                                        }`}
+                                    >
+                                        {selectedBeneficiaries.includes(u) && <Check className="w-3 h-3" />}
+                                        {u}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Exact Split UI */}
+                    {splitType === 'exact' && (
+                        <div className="space-y-2 animate-fadeIn">
+                             {users.map(u => (
+                                 <div key={`split-exact-${u}`} className="flex items-center gap-2">
+                                     <span className="text-xs font-bold text-stone-600 w-16 truncate text-right">{u}</span>
+                                     <div className="flex-1 relative">
+                                        <input 
+                                            type="number"
+                                            placeholder="0"
+                                            value={exactSplitAmounts[u] || ''}
+                                            onChange={(e) => handleExactAmountChange(u, e.target.value)}
+                                            className="w-full p-1.5 pl-2 text-sm border border-stone-300 rounded-lg outline-none focus:border-autumn-300 bg-white"
+                                        />
+                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-stone-400">{inputCurrency}</span>
+                                     </div>
+                                 </div>
+                             ))}
+                             
+                             {/* Validation Message */}
+                             <div className={`text-xs text-right font-bold mt-1 ${Math.abs(remainingSplit) < 0.1 ? 'text-green-500' : 'text-red-500'}`}>
+                                 {Math.abs(remainingSplit) < 0.1 
+                                    ? '✅ 金額吻合' 
+                                    : `⚠️ ${remainingSplit > 0 ? '還剩' : '超額'} ${Math.abs(remainingSplit).toFixed(1)}`
+                                 }
+                             </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -581,12 +688,25 @@ const ExpenseTracker: React.FC = () => {
                                 </span>
                             )}
                         </div>
-                        {/* Show split info if not everyone */}
-                        {users.length > 0 && expense.beneficiaries && expense.beneficiaries.length < users.length && (
-                             <div className="text-[10px] text-stone-400 mt-1 flex flex-wrap gap-1">
+                        {/* Show split info */}
+                        {users.length > 0 && (
+                            <div className="text-[10px] text-stone-400 mt-1 flex flex-wrap gap-1">
                                 <span>分給:</span>
-                                {expense.beneficiaries.map(b => <span key={b} className="bg-stone-50 px-1 rounded">{b}</span>)}
-                             </div>
+                                {expense.splitType === 'exact' 
+                                  ? (
+                                    // Show brief summary for exact split
+                                    Object.entries(expense.splitAmounts || {}).filter(([_, v]) => v > 0).map(([k, v]) => (
+                                        <span key={k} className="bg-stone-50 px-1 rounded">{k}({v})</span>
+                                    ))
+                                  ) 
+                                  : (
+                                    // Equal split
+                                    (expense.beneficiaries?.length || 0) < users.length 
+                                        ? expense.beneficiaries.map(b => <span key={b} className="bg-stone-50 px-1 rounded">{b}</span>)
+                                        : <span className="bg-stone-50 px-1 rounded">所有人</span>
+                                  )
+                                }
+                            </div>
                         )}
                     </div>
                 </div>
@@ -627,6 +747,63 @@ const ExpenseTracker: React.FC = () => {
             )}
         </div>
       </>
+      )}
+
+      {/* Settlement View */}
+      {activeTab === 'settlement' && (
+        <div className="space-y-4 animate-fadeIn">
+            {/* Balances Card */}
+            <div className="bg-white rounded-2xl border-2 border-stone-800 shadow-sketch p-4">
+                <h3 className="font-bold text-stone-800 text-lg mb-3 flex items-center gap-2 border-b border-stone-100 pb-2">
+                    <TrendingUp className="w-5 h-5 text-autumn-500" />
+                    目前收支狀態 (NTD)
+                </h3>
+                <div className="space-y-3">
+                    {Object.entries(settlementData.balances)
+                        .sort(([,a], [,b]) => b - a)
+                        .map(([user, amount]) => (
+                        <div key={user} className="flex justify-between items-center">
+                            <span className="font-bold text-stone-700">{user}</span>
+                            <span className={`font-mono font-bold ${amount > 0 ? 'text-green-600' : amount < 0 ? 'text-red-500' : 'text-stone-400'}`}>
+                                {amount > 0 ? '+' : ''}{amount.toFixed(0)}
+                            </span>
+                        </div>
+                    ))}
+                    {users.length === 0 && <p className="text-center text-stone-400 text-sm">暫無成員</p>}
+                </div>
+            </div>
+
+            {/* Transactions Card */}
+            <div className="bg-stone-800 text-white rounded-2xl shadow-sketch-lg p-5">
+                <h3 className="font-bold text-autumn-300 text-lg mb-4 flex items-center gap-2">
+                    <HandCoins className="w-5 h-5" />
+                    建議結算方式
+                </h3>
+                <div className="space-y-4">
+                    {settlementData.transactions.length > 0 ? (
+                        settlementData.transactions.map((t, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-stone-700/50 p-3 rounded-xl border border-stone-600">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-red-300">{t.from}</span>
+                                    <ArrowRightLeft className="w-4 h-4 text-stone-400" />
+                                    <span className="font-bold text-green-300">{t.to}</span>
+                                </div>
+                                <div className="font-bold text-xl text-white">
+                                    ${t.amount.toFixed(0)}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center text-stone-400 py-4">
+                            目前沒有需要結算的款項 🎉
+                        </div>
+                    )}
+                </div>
+                <p className="text-xs text-stone-500 mt-4 text-center">
+                    * 計算已自動轉換匯率為台幣
+                </p>
+            </div>
+        </div>
       )}
 
       {/* Member Management Modal */}
