@@ -58,7 +58,7 @@ export interface GeneralInfo {
     location: string;
     description: string;
     googleMapLink: string;
-    imageUrl: string; // 新增圖片欄位
+    // imageUrl removed
   };
   tips: string[];
 }
