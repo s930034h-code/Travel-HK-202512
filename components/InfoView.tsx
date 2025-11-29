@@ -216,7 +216,7 @@ const InfoView: React.FC = () => {
                       {/* PDF Download Button */}
                       {/* Note: User must place 'booking.pdf' in the public folder */}
                       <a 
-                        href="booking.pdf" 
+                        href="./booking.pdf" 
                         target="_blank"
                         rel="noopener noreferrer"
                         download="booking.pdf"
