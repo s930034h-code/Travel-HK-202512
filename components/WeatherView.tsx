@@ -11,7 +11,7 @@ interface HKOForecastItem {
   forecastMaxrh: { value: number; unit: 'percent' };
   forecastMinrh: { value: number; unit: 'percent' };
   forecastWeather: string;
-  forecastIcon: number;
+  ForecastIcon: number; 
   PSR: string; // "Low", "Medium", "High" 等
 }
 
@@ -25,13 +25,25 @@ interface HKOWeatherResponse {
 const WeatherIconDisplay: React.FC<{ iconCode: number; altText: string }> = ({ iconCode, altText }) => {
   const [imageError, setImageError] = useState(false);
 
+  // 建構圖片路徑 (假設圖片放在 public/weather_icons/ 資料夾下)
+  const imagePath = `/weather_icons/pic${iconCode}.png`;
+
   // 當圖片載入失敗時 (例如使用者還沒放圖片進去)，呼叫此函式切換為向量圖
   const handleImageError = () => {
+    console.warn(`[WeatherIcon] 無法讀取圖片: ${imagePath}，切換為備用圖示。`);
     setImageError(true);
   };
 
+  // 用於除錯：確認是否有收到 iconCode
+  useEffect(() => {
+    if (iconCode) {
+      // 如果您在 Console 看到這個，代表程式碼有收到 API 的代碼，問題出在圖片路徑
+      // console.log(`[WeatherIcon] 嘗試讀取: ${imagePath}`);
+    }
+  }, [iconCode, imagePath]);
+
   // 如果圖片載入失敗，回傳對應的 Lucide 向量圖示
-  if (imageError) {
+  if (imageError || iconCode === undefined) {
     // 50: 陽光充沛 (Sunny)
     if (iconCode === 50) return <Sun className="w-12 h-12 text-orange-500 animate-pulse" />;
     
@@ -56,14 +68,15 @@ const WeatherIconDisplay: React.FC<{ iconCode: number; altText: string }> = ({ i
     // 90+: 雷暴 (Thunderstorm)
     if (iconCode >= 90) return <CloudLightning className="w-12 h-12 text-purple-600 animate-pulse" />;
     
-    // Default
+    // Default Fallback
     return <Cloud className="w-12 h-12 text-stone-300" />;
   }
 
-  // 預設回傳本地圖片 (請確保檔案放在 /weather_icons/pic50.png)
+  // 預設回傳本地圖片
+  // 注意：這裡使用絕對路徑 /weather_icons/... 這代表圖片必須放在專案的 public 資料夾內
   return (
     <img 
-      src={`/weather_icons/pic${iconCode}.png`}
+      src={imagePath}
       alt={altText}
       onError={handleImageError}
       className="w-14 h-14 object-contain filter drop-shadow-sm"
@@ -210,10 +223,9 @@ const WeatherView: React.FC = () => {
                 {/* Weather Icon (Priority: Local File -> Fallback: Vector Icon) */}
                 <div className="flex flex-col items-center justify-center w-16 flex-shrink-0 text-center pl-1">
                   <WeatherIconDisplay 
-                    iconCode={day.forecastIcon} 
+                    iconCode={day.ForecastIcon} 
                     altText={day.forecastWeather} 
                   />
-                  {/* Text Removed per previous request */}
                 </div>
               </div>
             );
