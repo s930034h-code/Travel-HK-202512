@@ -216,9 +216,10 @@ const InfoView: React.FC = () => {
                       {/* PDF Download Button */}
                       {/* Note: User must place 'booking.pdf' in the public folder */}
                       <a 
-                        href="/booking.pdf" 
+                        href="booking.pdf" 
                         target="_blank"
                         rel="noopener noreferrer"
+                        download="booking.pdf"
                         className="flex-1 flex items-center justify-center gap-2 bg-autumn-100 text-autumn-600 border-2 border-autumn-200 py-2.5 rounded-xl font-bold hover:bg-autumn-200 transition-colors shadow-sm text-sm"
                       >
                           <FileText className="w-4 h-4" />
