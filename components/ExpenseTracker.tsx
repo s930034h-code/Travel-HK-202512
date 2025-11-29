@@ -73,8 +73,14 @@ const ExpenseTracker: React.FC = () => {
       if (data) {
          const userList = Object.values(data) as string[];
          setUsers(userList);
-         // 若當前付款人無效，重置為第一位
-         if (userList.length > 0 && paidBy === 'Me') setPaidBy(userList[0]);
+         // 若當前付款人不在名單中，重置為第一位
+         if (userList.length > 0 && !userList.includes(paidBy) && paidBy !== 'Me') {
+             setPaidBy(userList[0]);
+         }
+      } else {
+         // Fix: Handle empty data (when last user is deleted)
+         setUsers([]);
+         setPaidBy('Me');
       }
     });
 
@@ -90,7 +96,7 @@ const ExpenseTracker: React.FC = () => {
     });
 
     return () => { unsubExpenses(); unsubUsers(); unsubConfig(); };
-  }, []);
+  }, [paidBy]);
 
   // 當使用者列表載入時，預設全選所有人分帳
   useEffect(() => {
@@ -623,74 +629,10 @@ const ExpenseTracker: React.FC = () => {
       </>
       )}
 
-      {/* Settlement Tab */}
-      {activeTab === 'settlement' && (
-          <div className="animate-fadeIn space-y-4">
-              {users.length === 0 ? (
-                  <div className="text-center p-8 bg-white rounded-2xl border-2 border-stone-200 border-dashed">
-                      <p className="text-stone-500">請先到「記帳」頁面新增成員，才能開始分帳喔！</p>
-                  </div>
-              ) : (
-                  <>
-                    <div className="bg-stone-800 text-white p-5 rounded-2xl shadow-sketch-lg relative">
-                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                             <TrendingUp className="w-5 h-5 text-autumn-300" /> 目前餘額 (NT$)
-                        </h3>
-                        <div className="space-y-3">
-                            {Object.entries(settlementData.balances).map(([name, balance]) => (
-                                <div key={name} className="flex justify-between items-center border-b border-stone-700 pb-2 last:border-0 last:pb-0">
-                                    <span className="font-bold text-lg">{name}</span>
-                                    <span className={`font-mono font-bold text-lg ${balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {balance > 0 ? '+' : ''}{balance.toFixed(0)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-4 text-[10px] text-stone-500 text-center">
-                            正數代表別人欠你錢，負數代表你欠別人錢
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-5 rounded-2xl border-2 border-stone-800 shadow-sketch">
-                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-stone-800">
-                             <ArrowRightLeft className="w-5 h-5 text-autumn-400" /> 建議轉帳方案
-                        </h3>
-                        {settlementData.transactions.length === 0 ? (
-                            <div className="text-center py-4 text-stone-500 bg-stone-50 rounded-xl">
-                                目前沒有需要結算的款項 🎉
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {settlementData.transactions.map((t, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-stone-50 p-3 rounded-xl border border-stone-200">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-stone-700">{t.from}</span>
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-[10px] text-stone-400">給</span>
-                                                <ArrowRightLeft className="w-4 h-4 text-stone-400" />
-                                            </div>
-                                            <span className="font-bold text-stone-700">{t.to}</span>
-                                        </div>
-                                        <div className="font-bold text-autumn-500 font-sans text-xl">
-                                            ${t.amount.toFixed(0)}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <p className="mt-4 text-xs text-stone-400">
-                            *此方案為最小化轉帳次數的建議，所有金額已換算為台幣。
-                        </p>
-                    </div>
-                  </>
-              )}
-          </div>
-      )}
-
       {/* Member Management Modal */}
       {showMemberModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-paper p-6 rounded-2xl border-2 border-stone-800 shadow-sketch-lg w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-paper p-4 rounded-2xl border-2 border-stone-800 shadow-sketch-lg w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-stone-800 flex items-center gap-2">
                         <Users className="w-5 h-5 text-autumn-300" /> 成員管理
@@ -706,10 +648,10 @@ const ExpenseTracker: React.FC = () => {
                         value={newMemberName}
                         onChange={(e) => setNewMemberName(e.target.value)}
                         placeholder="輸入名字 (e.g. 媽媽)"
-                        className="flex-1 p-2 border-2 border-stone-300 rounded-lg outline-none focus:border-autumn-300 bg-white"
+                        className="flex-1 min-w-0 p-2 border-2 border-stone-300 rounded-lg outline-none focus:border-autumn-300 bg-white"
                         autoFocus
                     />
-                    <button type="submit" className="bg-stone-800 text-white px-4 rounded-lg font-bold">
+                    <button type="submit" className="bg-stone-800 text-white px-4 rounded-lg font-bold flex-shrink-0">
                         <Plus className="w-5 h-5" />
                     </button>
                 </form>
