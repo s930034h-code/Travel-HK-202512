@@ -1,3 +1,4 @@
+
 import * as firebaseApp from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 
@@ -12,6 +13,9 @@ const firebaseConfig = {
   messagingSenderId: "451450729564",
   appId: "1:451450729564:web:56a06069f23ba85b3ca299"
 };
+
+// Simple check to see if the user has configured the keys
+export const isFirebaseConfigured = !firebaseConfig.apiKey.includes("AIzaSyDGuhHXGAQ6GW_G6OiYNiFIJaLZjuOlT1s");
 
 // Initialize Firebase
 const app = firebaseApp.initializeApp(firebaseConfig);

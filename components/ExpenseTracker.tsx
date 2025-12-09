@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Expense } from '../types';
-import { db } from '../firebase';
+import { db, isFirebaseConfigured } from '../firebase';
 import { ref, push, onValue, remove, set } from 'firebase/database';
-import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X, CloudLightning, Users, Settings, ArrowRightLeft, Check, TrendingUp, HandCoins, Divide, MousePointer2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X, CloudLightning, Users, Settings, ArrowRightLeft, Check, TrendingUp, HandCoins, Divide, MousePointer2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const COLORS = ['#F08A5D', '#B83B5E', '#6A2C70', '#44403C'];
@@ -49,6 +49,9 @@ const ExpenseTracker: React.FC = () => {
 
   // Sync Data
   useEffect(() => {
+    // If config is missing, don't try to connect to avoid console errors
+    if (!isFirebaseConfigured) return;
+
     const expensesRef = ref(db, 'expenses');
     const usersRef = ref(db, 'users');
     const configRef = ref(db, 'config');
@@ -139,6 +142,11 @@ const ExpenseTracker: React.FC = () => {
 
   const updateExchangeRate = (e: React.FormEvent) => {
       e.preventDefault();
+      if (!isFirebaseConfigured) {
+          alert("請先設定 Firebase Key (firebase.ts) 才能儲存設定。");
+          return;
+      }
+
       const rate = parseFloat(newRateInput);
       if (rate > 0) {
           set(ref(db, 'config/exchangeRate'), rate);
@@ -203,6 +211,9 @@ const ExpenseTracker: React.FC = () => {
     };
 
     try {
+        if (!isFirebaseConfigured) {
+            throw new Error("FirebaseNotConfigured");
+        }
         await push(ref(db, 'expenses'), newExpense);
         
         // Reset Form
@@ -211,14 +222,19 @@ const ExpenseTracker: React.FC = () => {
         if (users.length > 0) {
             setExactSplitAmounts(users.reduce((acc, u) => ({...acc, [u]: ''}), {}));
         }
-    } catch (error) {
-        alert("儲存失敗，請檢查網路連線");
+    } catch (error: any) {
+        if (error.message === "FirebaseNotConfigured" || error.code === "PERMISSION_DENIED") {
+            alert("儲存失敗：請先至 firebase.ts 設定您的 Firebase API Key (YOUR_API_KEY)。");
+        } else {
+            alert("儲存失敗，請檢查網路連線");
+        }
         console.error(error);
     }
   };
 
   const removeExpense = (id: string) => {
       if(confirm('確定要刪除這筆紀錄嗎？')) {
+          if (!isFirebaseConfigured) return;
           remove(ref(db, `expenses/${id}`));
       }
   };
@@ -226,6 +242,10 @@ const ExpenseTracker: React.FC = () => {
   const addMember = (e: React.FormEvent) => {
       e.preventDefault();
       if(!newMemberName.trim()) return;
+      if (!isFirebaseConfigured) {
+          alert("請先設定 Firebase Key 才能新增成員。");
+          return;
+      }
       const updatedUsers = [...users, newMemberName.trim()];
       set(ref(db, 'users'), updatedUsers);
       setNewMemberName('');
@@ -234,6 +254,7 @@ const ExpenseTracker: React.FC = () => {
 
   const removeMember = (nameToRemove: string) => {
       if (!confirm(`確定要刪除 ${nameToRemove} 嗎？這可能會影響歷史帳務顯示。`)) return;
+      if (!isFirebaseConfigured) return;
       const updatedUsers = users.filter(u => u !== nameToRemove);
       set(ref(db, 'users'), updatedUsers);
   };
@@ -359,6 +380,19 @@ const ExpenseTracker: React.FC = () => {
           </button>
       </div>
 
+      {/* Firebase Warning Banner */}
+      {!isFirebaseConfigured && (
+        <div className="bg-amber-100 border-l-4 border-amber-500 p-3 rounded shadow-sm animate-pulse">
+            <div className="flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <div className="text-xs text-amber-800">
+                    <p className="font-bold">尚未設定資料庫金鑰</p>
+                    <p>請開啟 <code>firebase.ts</code> 並填入您的 Firebase 設定，否則資料無法儲存。</p>
+                </div>
+            </div>
+        </div>
+      )}
+
       {activeTab === 'record' && (
       <>
         {/* Sync Status / Filter Bar */}
@@ -379,7 +413,7 @@ const ExpenseTracker: React.FC = () => {
                     </button>
                     <div className={`text-xs flex items-center gap-1 ${isOnline ? 'text-green-600' : 'text-stone-400'}`}>
                         <CloudLightning className="w-3 h-3" />
-                        {isOnline ? '已同步' : '連線中'}
+                        {isOnline ? '已同步' : '未連線'}
                     </div>
                 </div>
             </div>
@@ -642,7 +676,9 @@ const ExpenseTracker: React.FC = () => {
                 </select>
                 <button 
                     type="submit" 
-                    className="flex-1 bg-stone-800 text-white p-3 rounded-xl font-bold hover:bg-stone-700 transition-colors flex justify-center items-center gap-2 shadow-sm active:translate-y-0.5 active:shadow-none"
+                    className={`flex-1 text-white p-3 rounded-xl font-bold transition-colors flex justify-center items-center gap-2 shadow-sm active:translate-y-0.5 active:shadow-none ${
+                        isFirebaseConfigured ? 'bg-stone-800 hover:bg-stone-700' : 'bg-stone-400 cursor-not-allowed'
+                    }`}
                 >
                     <Plus className="w-5 h-5" /> 
                     <span>記一筆</span>
@@ -757,7 +793,7 @@ const ExpenseTracker: React.FC = () => {
                 <div className="text-center text-stone-400 py-10 border-2 border-dashed border-stone-300 rounded-2xl bg-stone-50/50">
                     <Calculator className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p className="font-hand text-xl">
-                    {expenses.length === 0 ? (isOnline ? '還沒有記帳紀錄喔' : '連線中...') : '沒有符合查詢的紀錄'}
+                    {expenses.length === 0 ? (isOnline ? '還沒有記帳紀錄喔' : (isFirebaseConfigured ? '連線中...' : '請設定 Firebase Key')) : '沒有符合查詢的紀錄'}
                     </p>
                 </div>
             )}

@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { ITINERARY_DATA } from '../constants';
 import { DailyItinerary, ItineraryEvent } from '../types';
-import { db } from '../firebase';
+import { db, isFirebaseConfigured } from '../firebase';
 import { ref, onValue, set } from 'firebase/database';
-import { MapPin, Utensils, Bus, ShoppingBag, BedDouble, Plane, Sparkles, Map, Info, Edit3, Plus, Trash2, Save, X, Check, Loader2 } from 'lucide-react';
+import { MapPin, Utensils, Bus, ShoppingBag, BedDouble, Plane, Sparkles, Map, Info, Edit3, Plus, Trash2, Save, X, Check, Loader2, AlertTriangle } from 'lucide-react';
 
 const IconMap: Record<string, React.ReactNode> = {
   food: <Utensils className="w-4 h-4" />,
@@ -29,6 +29,13 @@ const ItineraryView: React.FC = () => {
 
   // Sync with Firebase
   useEffect(() => {
+    // If not configured, don't try to sync, just load static data and stop loading
+    if (!isFirebaseConfigured) {
+        setItinerary(ITINERARY_DATA);
+        setIsLoading(false);
+        return;
+    }
+
     const itineraryRef = ref(db, 'itinerary');
     
     const unsubscribe = onValue(itineraryRef, (snapshot) => {
@@ -88,6 +95,11 @@ const ItineraryView: React.FC = () => {
   const handleDeleteClick = (index: number) => {
     if (!window.confirm("確定要刪除這個行程嗎？")) return;
     
+    if (!isFirebaseConfigured) {
+        alert("請先設定 Firebase Key 才能修改資料。");
+        return;
+    }
+
     const updatedItinerary = [...itinerary];
     updatedItinerary[currentDayIndex].events.splice(index, 1);
     
@@ -100,6 +112,11 @@ const ItineraryView: React.FC = () => {
   const handleSaveForm = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!isFirebaseConfigured) {
+        alert("請先設定 Firebase Key 才能儲存修改。");
+        return;
+    }
+
     const updatedItinerary = [...itinerary];
     const newEvent = editFormData as ItineraryEvent;
 
@@ -124,7 +141,7 @@ const ItineraryView: React.FC = () => {
       <div className="flex justify-between items-center px-4 py-2 bg-stone-50 border-b border-stone-200">
          <span className={`text-xs flex items-center gap-1 ${isOnline ? 'text-green-600' : 'text-stone-400'}`}>
              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-stone-300'}`}></div>
-             {isOnline ? '已同步' : '離線'}
+             {isOnline ? '已同步' : (isFirebaseConfigured ? '離線' : '未連線')}
          </span>
          <button 
            onClick={() => setIsEditing(!isEditing)}
@@ -138,6 +155,14 @@ const ItineraryView: React.FC = () => {
            {isEditing ? '完成編輯' : '編輯行程'}
          </button>
       </div>
+
+      {/* Warning Banner */}
+      {!isFirebaseConfigured && (
+        <div className="bg-amber-100 border-b border-amber-300 p-2 flex items-center justify-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span className="text-xs text-amber-800 font-bold">尚未設定 Firebase Key，目前為預覽模式</span>
+        </div>
+      )}
 
       {/* Day Selector */}
       <div className="flex overflow-x-auto p-4 gap-3 bg-autumn-100/50 border-b-2 border-stone-800 border-dashed no-scrollbar">
@@ -415,7 +440,10 @@ const ItineraryView: React.FC = () => {
 
                     <button 
                         type="submit" 
-                        className="w-full bg-stone-800 text-white font-bold text-lg py-3 rounded-xl hover:bg-stone-700 transition-colors shadow-sketch flex items-center justify-center gap-2 mt-2"
+                        className={`w-full text-white font-bold text-lg py-3 rounded-xl transition-colors shadow-sketch flex items-center justify-center gap-2 mt-2 ${
+                            isFirebaseConfigured ? 'bg-stone-800 hover:bg-stone-700' : 'bg-stone-400 cursor-not-allowed'
+                        }`}
+                        disabled={!isFirebaseConfigured}
                     >
                         <Save className="w-5 h-5" /> 儲存行程
                     </button>
