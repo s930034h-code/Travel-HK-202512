@@ -223,12 +223,16 @@ const ExpenseTracker: React.FC = () => {
             setExactSplitAmounts(users.reduce((acc, u) => ({...acc, [u]: ''}), {}));
         }
     } catch (error: any) {
-        if (error.message === "FirebaseNotConfigured" || error.code === "PERMISSION_DENIED") {
-            alert("儲存失敗：請先至 firebase.ts 設定您的 Firebase API Key (YOUR_API_KEY)。");
+        console.error("Firebase Write Error:", error);
+
+        if (error.message === "FirebaseNotConfigured") {
+            alert("儲存失敗：請先至 firebase.ts 設定您的 Firebase API Key。");
+        } else if (error.code === "PERMISSION_DENIED") {
+            // This is the most likely error
+            alert("⚠️ 儲存失敗：權限不足 (PERMISSION_DENIED)\n\n請檢查您的 Firebase Realtime Database 規則 (Rules)，必須設為 read: true, write: true。");
         } else {
-            alert("儲存失敗，請檢查網路連線");
+            alert(`儲存失敗: ${error.message}\n(Code: ${error.code || 'Unknown'})`);
         }
-        console.error(error);
     }
   };
 

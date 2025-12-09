@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { GENERAL_INFO } from '../constants';
-import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle } from 'lucide-react';
-import { getDebugInfo } from '../firebase';
+import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import { getDebugInfo, db } from '../firebase';
+import { ref, set, remove } from 'firebase/database';
 
 type InfoTab = 'flight' | 'hotel' | 'tips' | 'code';
 
@@ -267,7 +268,25 @@ const BoardingPass: React.FC<{
 
 const InfoView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<InfoTab>('flight');
+  const [testStatus, setTestStatus] = useState<string>('');
   const debugInfo = getDebugInfo();
+
+  const runConnectionTest = async () => {
+    setTestStatus('Testing...');
+    try {
+        const testRef = ref(db, 'connection_test');
+        await set(testRef, { timestamp: Date.now(), status: 'ok' });
+        await remove(testRef);
+        setTestStatus('✅ 連線成功 (Write/Delete OK)');
+    } catch (e: any) {
+        console.error(e);
+        if (e.code === 'PERMISSION_DENIED') {
+            setTestStatus('❌ 權限不足 (請檢查 Database Rules)');
+        } else {
+            setTestStatus(`❌ 失敗: ${e.message}`);
+        }
+    }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -428,27 +447,44 @@ const InfoView: React.FC = () => {
         )}
 
         {/* System Diagnostic Footer */}
-        <div className="mt-8 pt-4 border-t-2 border-dashed border-stone-300 text-center space-y-2">
+        <div className="mt-8 pt-4 border-t-2 border-dashed border-stone-300 text-center space-y-2 pb-6">
             <div className="inline-flex items-center gap-2 bg-stone-200 px-3 py-1 rounded-full text-[10px] text-stone-600 font-mono tracking-wider">
                <Terminal className="w-3 h-3" />
-               SYSTEM DIAGNOSTIC (v1.1)
+               SYSTEM DIAGNOSTIC (v1.2)
             </div>
             
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-2 text-xs text-left">
                 <div className={`p-2 rounded-lg border ${debugInfo.configured ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                    <div className="font-bold flex items-center justify-center gap-1">
+                    <div className="font-bold flex items-center justify-center gap-1 mb-1">
                         {debugInfo.configured ? <CheckCircle2 className="w-3 h-3"/> : <XCircle className="w-3 h-3"/>}
-                        Firebase Status
+                        Firebase SDK
                     </div>
-                    <div>{debugInfo.configured ? 'Configured' : 'Missing Key'}</div>
+                    <div className="text-center">{debugInfo.configured ? 'Config Loaded' : 'Missing Key'}</div>
                 </div>
-                <div className="p-2 rounded-lg bg-stone-100 border border-stone-200 text-stone-600 font-mono">
-                    <div className="font-bold">Loaded Key</div>
-                    <div className="break-all">{debugInfo.keyPreview}</div>
+                <div className="p-2 rounded-lg bg-stone-100 border border-stone-200 text-stone-600 font-mono flex flex-col justify-center text-center">
+                    <div className="font-bold text-[10px] text-stone-400">Key Preview</div>
+                    <div className="break-all font-bold">{debugInfo.keyPreview}</div>
                 </div>
             </div>
-            <p className="text-[10px] text-stone-400">
-                如果 Key 顯示為 "YOUR..."，請清除手機快取或重新整理。
+
+            {/* Test Connection Button */}
+            <div className="bg-white p-2 rounded-xl border border-stone-200 mt-2">
+                <button 
+                  onClick={runConnectionTest}
+                  className="w-full bg-stone-800 text-white text-xs font-bold py-2 rounded-lg hover:bg-stone-700 transition-colors flex items-center justify-center gap-2"
+                >
+                    <RefreshCw className="w-3 h-3" />
+                    測試寫入權限 (Test Write)
+                </button>
+                {testStatus && (
+                    <div className={`mt-2 text-xs font-bold ${testStatus.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>
+                        {testStatus}
+                    </div>
+                )}
+            </div>
+
+            <p className="text-[10px] text-stone-400 px-4">
+                若測試結果為 "Permission Denied"，請至 Firebase Console 修改 Rules 為 true。
             </p>
         </div>
 
