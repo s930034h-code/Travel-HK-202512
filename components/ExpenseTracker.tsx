@@ -196,6 +196,7 @@ const ExpenseTracker: React.FC = () => {
             : users.filter(u => (finalSplitAmounts[u] || 0) > 0);
     }
 
+    // 建立新消費紀錄物件 (不包含 undefined 的屬性)
     const newExpense: Omit<Expense, 'id'> = {
       item: newItem,
       originalAmount: amountVal,
@@ -203,12 +204,16 @@ const ExpenseTracker: React.FC = () => {
       paidBy: paidBy,
       beneficiaries: finalBeneficiaries,
       splitType,
-      splitAmounts: splitType === 'exact' ? finalSplitAmounts : undefined,
       category,
       date,
       paymentMethod,
       timestamp: Date.now()
     };
+
+    // 只有在 'exact' 模式下才加入 splitAmounts，避免 undefined 錯誤
+    if (splitType === 'exact') {
+        newExpense.splitAmounts = finalSplitAmounts;
+    }
 
     try {
         if (!isFirebaseConfigured) {
@@ -228,7 +233,6 @@ const ExpenseTracker: React.FC = () => {
         if (error.message === "FirebaseNotConfigured") {
             alert("儲存失敗：請先至 firebase.ts 設定您的 Firebase API Key。");
         } else if (error.code === "PERMISSION_DENIED") {
-            // This is the most likely error
             alert("⚠️ 儲存失敗：權限不足 (PERMISSION_DENIED)\n\n請檢查您的 Firebase Realtime Database 規則 (Rules)，必須設為 read: true, write: true。");
         } else {
             alert(`儲存失敗: ${error.message}\n(Code: ${error.code || 'Unknown'})`);
