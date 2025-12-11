@@ -19,9 +19,17 @@ export interface DailyItinerary {
   events: ItineraryEvent[];
 }
 
+export interface ExpenseItemDetail {
+  id: string;
+  name: string;
+  amount: number;
+}
+
 export interface Expense {
   id: string;
-  item: string;
+  item: string; // 店家名稱 (Store Name)
+  details?: ExpenseItemDetail[]; // 新增：品項細節
+  
   originalAmount: number; // 使用者輸入的原始金額
   currency: 'HKD' | 'TWD'; // 使用者輸入的幣別
   amountHKD?: number; // 計算後的港幣 (舊資料相容)

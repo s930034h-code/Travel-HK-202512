@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Expense } from '../types';
+import { Expense, ExpenseItemDetail } from '../types';
 import { db, isFirebaseConfigured } from '../firebase';
 import { ref, push, onValue, remove, set } from 'firebase/database';
-import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X, CloudLightning, Users, Settings, ArrowRightLeft, Check, TrendingUp, HandCoins, Divide, MousePointer2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Calculator, Wallet, CreditCard, Banknote, Wifi, Smartphone, Search, X, CloudLightning, Users, Settings, ArrowRightLeft, Check, TrendingUp, HandCoins, Divide, MousePointer2, AlertCircle, AlertTriangle, Store, Receipt } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const COLORS = ['#F08A5D', '#B83B5E', '#6A2C70', '#44403C'];
@@ -22,8 +22,8 @@ const ExpenseTracker: React.FC = () => {
   const [users, setUsers] = useState<string[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(DEFAULT_RATE);
   
-  // Form State
-  const [newItem, setNewItem] = useState('');
+  // Form State - Main
+  const [storeName, setStoreName] = useState(''); // 原本的 item 改為店家名稱
   const [newAmount, setNewAmount] = useState('');
   const [inputCurrency, setInputCurrency] = useState<'HKD' | 'TWD'>('HKD');
   const [category, setCategory] = useState<'food' | 'transport' | 'shopping' | 'other'>('food');
@@ -31,6 +31,11 @@ const ExpenseTracker: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'applepay' | 'octopus'>('cash');
   const [paidBy, setPaidBy] = useState<string>('Me');
   
+  // Form State - Sub Items
+  const [subItems, setSubItems] = useState<ExpenseItemDetail[]>([]);
+  const [subItemName, setSubItemName] = useState('');
+  const [subItemPrice, setSubItemPrice] = useState('');
+
   // Split Logic State
   const [splitType, setSplitType] = useState<'equal' | 'exact'>('equal');
   const [selectedBeneficiaries, setSelectedBeneficiaries] = useState<string[]>([]);
@@ -67,7 +72,8 @@ const ExpenseTracker: React.FC = () => {
           originalAmount: value.originalAmount || value.amountHKD || 0, // 舊資料轉移
           beneficiaries: value.beneficiaries || [],
           splitType: value.splitType || 'equal',
-          splitAmounts: value.splitAmounts || {}
+          splitAmounts: value.splitAmounts || {},
+          details: value.details || [] // 讀取細項
         }));
         setExpenses(expenseList);
       } else {
@@ -122,6 +128,37 @@ const ExpenseTracker: React.FC = () => {
       }
   }, [users]);
 
+  // 自動計算總金額 (當有細項時)
+  useEffect(() => {
+    if (subItems.length > 0) {
+      const total = subItems.reduce((acc, item) => acc + item.amount, 0);
+      setNewAmount(total.toString());
+    }
+  }, [subItems]);
+
+  // Add Sub Item
+  const handleAddSubItem = () => {
+    if (!subItemName.trim() || !subItemPrice) return;
+    const price = parseFloat(subItemPrice);
+    if (isNaN(price) || price <= 0) return;
+
+    const newItem: ExpenseItemDetail = {
+      id: Date.now().toString(),
+      name: subItemName,
+      amount: price
+    };
+
+    setSubItems([...subItems, newItem]);
+    setSubItemName('');
+    setSubItemPrice('');
+    
+    // Focus back to name input (optional, via ref, skipping for simplicity)
+  };
+
+  const removeSubItem = (id: string) => {
+    setSubItems(subItems.filter(item => item.id !== id));
+  };
+
   // Handle Equal Split Toggle
   const toggleBeneficiary = (user: string) => {
       if (selectedBeneficiaries.includes(user)) {
@@ -158,8 +195,8 @@ const ExpenseTracker: React.FC = () => {
     e.preventDefault();
     
     // 基本驗證
-    if (!newItem.trim()) {
-        alert("請輸入項目名稱");
+    if (!storeName.trim()) {
+        alert("請輸入店家名稱");
         return;
     }
     if (!newAmount || parseFloat(newAmount) <= 0) {
@@ -188,7 +225,6 @@ const ExpenseTracker: React.FC = () => {
     // Determine beneficiaries
     let finalBeneficiaries: string[] = [];
     if (users.length === 0) {
-        // 如果沒有成員，預設只有 "Me" (或其他邏輯，這邊簡化處理)
         finalBeneficiaries = [];
     } else {
         finalBeneficiaries = splitType === 'equal' 
@@ -196,9 +232,10 @@ const ExpenseTracker: React.FC = () => {
             : users.filter(u => (finalSplitAmounts[u] || 0) > 0);
     }
 
-    // 建立新消費紀錄物件 (不包含 undefined 的屬性)
+    // 建立新消費紀錄物件
     const newExpense: Omit<Expense, 'id'> = {
-      item: newItem,
+      item: storeName, // 店家名稱
+      details: subItems, // 細項
       originalAmount: amountVal,
       currency: inputCurrency,
       paidBy: paidBy,
@@ -210,7 +247,6 @@ const ExpenseTracker: React.FC = () => {
       timestamp: Date.now()
     };
 
-    // 只有在 'exact' 模式下才加入 splitAmounts，避免 undefined 錯誤
     if (splitType === 'exact') {
         newExpense.splitAmounts = finalSplitAmounts;
     }
@@ -222,8 +258,11 @@ const ExpenseTracker: React.FC = () => {
         await push(ref(db, 'expenses'), newExpense);
         
         // Reset Form
-        setNewItem('');
+        setStoreName('');
         setNewAmount('');
+        setSubItems([]);
+        setSubItemName('');
+        setSubItemPrice('');
         if (users.length > 0) {
             setExactSplitAmounts(users.reduce((acc, u) => ({...acc, [u]: ''}), {}));
         }
@@ -500,25 +539,83 @@ const ExpenseTracker: React.FC = () => {
                 </div>
             )}
 
-            <div className="flex gap-3">
-            <input 
-                type="text" 
-                placeholder="項目 (e.g. 雞蛋仔)" 
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                className="flex-1 min-w-0 p-3 bg-stone-50 rounded-xl border-2 border-stone-200 focus:border-autumn-300 outline-none text-stone-800 placeholder:text-stone-400 text-lg transition-colors"
-            />
+            <div className="flex gap-2">
+                <div className="flex-1 relative">
+                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                    <input 
+                        type="text" 
+                        placeholder="店家名稱 (e.g. 澳洲牛奶公司)" 
+                        value={storeName}
+                        onChange={(e) => setStoreName(e.target.value)}
+                        className="w-full pl-9 p-3 bg-stone-50 rounded-xl border-2 border-stone-200 focus:border-autumn-300 outline-none text-stone-800 placeholder:text-stone-400 text-base transition-colors"
+                    />
+                </div>
             </div>
             
-            {/* Amount & Currency Row */}
+            {/* Sub-items Section */}
+            <div className="bg-stone-50 p-3 rounded-xl border border-stone-100 space-y-3">
+                <div className="text-xs font-bold text-stone-400 flex items-center gap-1">
+                    <Receipt className="w-3 h-3" />
+                    品項細節 (選填)
+                </div>
+                
+                {/* List of added sub-items */}
+                {subItems.length > 0 && (
+                    <div className="space-y-2 mb-2">
+                        {subItems.map((item) => (
+                            <div key={item.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-stone-200 shadow-sm text-sm">
+                                <span className="font-bold text-stone-700">{item.name}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-mono">{item.amount}</span>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => removeSubItem(item.id)}
+                                        className="text-stone-400 hover:text-red-500"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Sub-item Input Row */}
+                <div className="flex gap-2">
+                    <input 
+                        type="text"
+                        placeholder="品項 (e.g. 炒蛋)"
+                        value={subItemName}
+                        onChange={(e) => setSubItemName(e.target.value)}
+                        className="flex-1 min-w-0 p-2 bg-white rounded-lg border border-stone-300 outline-none text-sm focus:border-autumn-300"
+                    />
+                    <input 
+                        type="number"
+                        placeholder="$"
+                        value={subItemPrice}
+                        onChange={(e) => setSubItemPrice(e.target.value)}
+                        className="w-20 p-2 bg-white rounded-lg border border-stone-300 outline-none text-sm focus:border-autumn-300"
+                    />
+                    <button 
+                        type="button"
+                        onClick={handleAddSubItem}
+                        className="bg-stone-200 hover:bg-stone-300 text-stone-600 p-2 rounded-lg transition-colors"
+                    >
+                        <Plus className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Total Amount & Currency Row */}
             <div className="flex gap-2">
                 <div className="flex-1 flex bg-stone-50 rounded-xl border-2 border-stone-200 focus-within:border-autumn-300 overflow-hidden relative">
                     <input 
                         type="number" 
-                        placeholder="0" 
+                        placeholder="總金額" 
                         value={newAmount}
                         onChange={(e) => setNewAmount(e.target.value)}
-                        className="w-full p-3 bg-transparent outline-none text-lg text-stone-800"
+                        className={`w-full p-3 bg-transparent outline-none text-lg text-stone-800 ${subItems.length > 0 ? 'bg-stone-100 text-stone-500 cursor-not-allowed' : ''}`}
+                        readOnly={subItems.length > 0}
                     />
                     {newAmount && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-stone-400 pointer-events-none font-sans">
@@ -735,6 +832,18 @@ const ExpenseTracker: React.FC = () => {
                         <div className="font-bold text-stone-800 text-lg leading-tight flex items-center gap-2">
                             {expense.item}
                         </div>
+                        
+                        {/* Display Sub-items in List */}
+                        {expense.details && expense.details.length > 0 && (
+                            <div className="mt-1 text-sm text-stone-600 bg-stone-50 p-1.5 rounded-lg">
+                                {expense.details.map(d => (
+                                    <div key={d.id} className="flex justify-between gap-4 text-xs">
+                                        <span>{d.name}</span>
+                                        <span className="font-mono text-stone-400">${d.amount}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                             <span className="text-xs bg-stone-100 px-1.5 py-0.5 rounded text-stone-500">

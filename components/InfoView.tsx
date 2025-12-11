@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { GENERAL_INFO } from '../constants';
 import { GeneralInfo, FlightDetail } from '../types';
-import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle, RefreshCw, Edit3, Save, Check } from 'lucide-react';
+import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle, RefreshCw, Edit3, Save, Check, Trash2, Plus } from 'lucide-react';
 import { getDebugInfo, db, isFirebaseConfigured } from '../firebase';
 import { ref, set, remove, onValue } from 'firebase/database';
 
@@ -333,6 +333,22 @@ const InfoView: React.FC = () => {
       }));
   };
 
+  // Helper functions for tips
+  const updateTip = (index: number, value: string) => {
+      const newTips = [...(infoData.tips || [])];
+      newTips[index] = value;
+      setInfoData({ ...infoData, tips: newTips });
+  };
+
+  const addTip = () => {
+      setInfoData({ ...infoData, tips: [...(infoData.tips || []), ""] });
+  };
+
+  const deleteTip = (index: number) => {
+      const newTips = (infoData.tips || []).filter((_, i) => i !== index);
+      setInfoData({ ...infoData, tips: newTips });
+  };
+
   const runConnectionTest = async () => {
     setTestStatus('Testing...');
     try {
@@ -538,20 +554,47 @@ const InfoView: React.FC = () => {
           <div className="space-y-4 animate-fadeIn">
             <h2 className="text-2xl font-bold text-stone-800 border-l-4 border-autumn-200 pl-3">旅遊小貼士</h2>
             
-            {isEditing && (
-                <div className="bg-yellow-50 p-3 rounded-lg text-sm text-stone-600 mb-2">
-                    目前暫不支援編輯貼士，請直接修改 constants.ts 或聯絡管理員。
-                </div>
+            {isEditing ? (
+              <div className="space-y-3">
+                 {/* Tips Edit List */}
+                 {(infoData.tips || []).map((tip, idx) => (
+                    <div key={idx} className="flex gap-2 items-start bg-white p-2 rounded-xl border border-stone-300">
+                        <div className="bg-autumn-200 text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-2">
+                           {idx + 1}
+                        </div>
+                        <textarea
+                           value={tip}
+                           onChange={(e) => updateTip(idx, e.target.value)}
+                           className="flex-1 bg-transparent outline-none p-2 text-stone-700 text-sm resize-none h-20 border-b border-dashed border-stone-200 focus:border-autumn-300"
+                           placeholder="輸入貼士內容..."
+                        />
+                        <button 
+                          onClick={() => deleteTip(idx)}
+                          className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-1"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
+                 ))}
+                 
+                 {/* Add Tip Button */}
+                 <button 
+                   onClick={addTip}
+                   className="w-full py-3 border-2 border-dashed border-stone-400 rounded-xl text-stone-500 font-bold flex items-center justify-center gap-2 hover:bg-stone-50 hover:border-autumn-300 hover:text-autumn-300 transition-colors"
+                 >
+                     <Plus className="w-5 h-5" /> 新增一條貼士
+                 </button>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {infoData.tips.map((tip, idx) => (
+                  <div key={idx} className="bg-white p-4 rounded-xl border-2 border-stone-800 shadow-sm flex gap-3 items-start">
+                    <div className="text-autumn-300 font-bold text-xl mt-[-2px]">{idx + 1}.</div>
+                    <div className="text-stone-700 text-lg leading-snug">{tip}</div>
+                  </div>
+                ))}
+              </div>
             )}
-
-            <div className="grid gap-3">
-               {infoData.tips.map((tip, idx) => (
-                 <div key={idx} className="bg-white p-4 rounded-xl border-2 border-stone-800 shadow-sm flex gap-3 items-start">
-                   <div className="text-autumn-300 font-bold text-xl mt-[-2px]">{idx + 1}.</div>
-                   <div className="text-stone-700 text-lg leading-snug">{tip}</div>
-                 </div>
-               ))}
-            </div>
           </div>
         )}
 
