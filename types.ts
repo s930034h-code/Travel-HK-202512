@@ -47,10 +47,22 @@ export interface WeatherForecast {
   humidity: string;
 }
 
+// 詳細航班資訊結構
+export interface FlightDetail {
+  flightNo: string;
+  date: string;
+  fromCode: string;
+  toCode: string;
+  depTime: string;
+  arrTime: string;
+  terminal: string;
+  duration: string; // e.g. "2h 10m"
+}
+
 export interface GeneralInfo {
   flights: {
-    outbound: string;
-    inbound: string;
+    outbound: FlightDetail;
+    inbound: FlightDetail;
   };
   accommodation: {
     name: string;
@@ -58,7 +70,6 @@ export interface GeneralInfo {
     location: string;
     description: string;
     googleMapLink: string;
-    // imageUrl removed
   };
   tips: string[];
 }

@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GENERAL_INFO } from '../constants';
-import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
-import { getDebugInfo, db } from '../firebase';
-import { ref, set, remove } from 'firebase/database';
+import { GeneralInfo, FlightDetail } from '../types';
+import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle, RefreshCw, Edit3, Save, Check } from 'lucide-react';
+import { getDebugInfo, db, isFirebaseConfigured } from '../firebase';
+import { ref, set, remove, onValue } from 'firebase/database';
 
 type InfoTab = 'flight' | 'hotel' | 'tips' | 'code';
 
@@ -174,17 +175,11 @@ const HotelIllustration = () => (
   </svg>
 );
 
-// 登機證組件
+// 登機證組件 (Data Driven)
 const BoardingPass: React.FC<{
   type: 'Outbound' | 'Inbound';
-  flightNo: string;
-  date: string;
-  fromCode: string;
-  toCode: string;
-  depTime: string;
-  arrTime: string;
-  terminal: string;
-}> = ({ type, flightNo, date, fromCode, toCode, depTime, arrTime, terminal }) => {
+  data: FlightDetail;
+}> = ({ type, data }) => {
   return (
     <div className="bg-white rounded-3xl border-2 border-stone-800 shadow-sketch relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
       {/* Top Section: Main Info */}
@@ -207,27 +202,27 @@ const BoardingPass: React.FC<{
         {/* Date + Flight No - Bold & Larger */}
         <div className="mb-5 border-b-2 border-dashed border-stone-100 pb-4">
            <div className="text-2xl font-black text-stone-800 leading-tight">
-              {date} <span className="text-autumn-500 whitespace-nowrap">- {flightNo}</span>
+              {data.date} <span className="text-autumn-500 whitespace-nowrap">- {data.flightNo}</span>
            </div>
         </div>
 
         {/* Route Info */}
         <div className="flex justify-between items-center px-1">
           <div className="text-center">
-            <div className="text-4xl font-black text-stone-800 font-sans tracking-wider">{fromCode}</div>
-            <div className="text-xl font-bold text-stone-500 mt-1">{depTime}</div>
+            <div className="text-4xl font-black text-stone-800 font-sans tracking-wider">{data.fromCode}</div>
+            <div className="text-xl font-bold text-stone-500 mt-1">{data.depTime}</div>
           </div>
           
           <div className="flex-1 px-4 flex flex-col items-center">
              <div className="w-full h-0.5 bg-stone-300 relative">
                <Plane className="w-5 h-5 text-autumn-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-1 transform rotate-90" />
              </div>
-             <div className="text-xs text-stone-400 mt-2 font-sans">2h 10m</div>
+             <div className="text-xs text-stone-400 mt-2 font-sans">{data.duration}</div>
           </div>
 
           <div className="text-center">
-            <div className="text-4xl font-black text-stone-800 font-sans tracking-wider">{toCode}</div>
-            <div className="text-xl font-bold text-stone-500 mt-1">{arrTime}</div>
+            <div className="text-4xl font-black text-stone-800 font-sans tracking-wider">{data.toCode}</div>
+            <div className="text-xl font-bold text-stone-500 mt-1">{data.arrTime}</div>
           </div>
         </div>
       </div>
@@ -243,7 +238,7 @@ const BoardingPass: React.FC<{
          <div className="flex gap-4">
             <div>
               <span className="text-[10px] text-stone-400 uppercase font-bold block">Terminal</span>
-              <span className="text-lg font-bold text-stone-800">{terminal}</span>
+              <span className="text-lg font-bold text-stone-800">{data.terminal}</span>
             </div>
             <div>
               <span className="text-[10px] text-stone-400 uppercase font-bold block">Gate</span>
@@ -266,10 +261,77 @@ const BoardingPass: React.FC<{
   );
 };
 
+// Form Helper Component
+const EditInput: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string }> = ({ label, value, onChange, placeholder }) => (
+    <div className="mb-2">
+        <label className="block text-xs font-bold text-stone-500 mb-1">{label}</label>
+        <input 
+            type="text" 
+            value={value} 
+            onChange={e => onChange(e.target.value)}
+            className="w-full bg-stone-50 p-2 border border-stone-300 rounded-lg focus:border-autumn-300 outline-none text-sm"
+            placeholder={placeholder}
+        />
+    </div>
+);
+
 const InfoView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<InfoTab>('flight');
   const [testStatus, setTestStatus] = useState<string>('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [infoData, setInfoData] = useState<GeneralInfo>(GENERAL_INFO);
+  const [isOnline, setIsOnline] = useState(false);
+  
   const debugInfo = getDebugInfo();
+
+  // Sync data from Firebase
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    const infoRef = ref(db, 'general_info');
+    
+    const unsub = onValue(infoRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            setInfoData(data);
+            setIsOnline(true);
+        } else {
+            // If empty, sync default data
+            set(infoRef, GENERAL_INFO);
+            setIsOnline(true);
+        }
+    }, (error) => {
+        console.error(error);
+        setIsOnline(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSave = async () => {
+    if (!isFirebaseConfigured) {
+        alert("請設定 Firebase Key");
+        return;
+    }
+    try {
+        await set(ref(db, 'general_info'), infoData);
+        setIsEditing(false);
+    } catch (e: any) {
+        alert("儲存失敗: " + e.message);
+    }
+  };
+
+  // Helper to update specific flight fields
+  const updateFlight = (type: 'outbound' | 'inbound', field: keyof FlightDetail, value: string) => {
+      setInfoData(prev => ({
+          ...prev,
+          flights: {
+              ...prev.flights,
+              [type]: {
+                  ...prev.flights[type],
+                  [field]: value
+              }
+          }
+      }));
+  };
 
   const runConnectionTest = async () => {
     setTestStatus('Testing...');
@@ -289,7 +351,29 @@ const InfoView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden relative">
+      {/* Header with Edit Toggle */}
+      <div className="flex justify-between items-center px-4 py-2 bg-stone-50 border-b border-stone-200">
+         <span className={`text-xs flex items-center gap-1 ${isOnline ? 'text-green-600' : 'text-stone-400'}`}>
+             <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-stone-300'}`}></div>
+             {isOnline ? '已同步' : (isFirebaseConfigured ? '離線' : '未連線')}
+         </span>
+         <button 
+           onClick={() => {
+               if(isEditing) handleSave();
+               else setIsEditing(true);
+           }}
+           className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
+             isEditing 
+               ? 'bg-autumn-400 text-white shadow-sketch' 
+               : 'bg-white border border-stone-300 text-stone-500'
+           }`}
+         >
+           {isEditing ? <Save className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+           {isEditing ? '儲存變更' : '編輯資訊'}
+         </button>
+      </div>
+
       {/* Tab Navigation */}
       <div className="flex p-2 bg-autumn-100/50 border-b-2 border-stone-800 border-dashed gap-2 overflow-x-auto no-scrollbar">
         <TabButton 
@@ -327,28 +411,56 @@ const InfoView: React.FC = () => {
             <h2 className="text-2xl font-bold text-stone-800 border-l-4 border-autumn-300 pl-3">航班資訊</h2>
             
             {/* Outbound */}
-            <BoardingPass 
-              type="Outbound"
-              flightNo="CX407"
-              date="2025 Dec 12"
-              fromCode="TPE"
-              toCode="HKG"
-              depTime="08:20"
-              arrTime="10:30"
-              terminal="T1"
-            />
+            {isEditing ? (
+                <div className="bg-white p-4 rounded-xl border-2 border-dashed border-autumn-300 mb-4">
+                    <h3 className="font-bold text-autumn-500 mb-2">去程 (Outbound) 編輯</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                        <EditInput label="航班號" value={infoData.flights.outbound.flightNo} onChange={v => updateFlight('outbound', 'flightNo', v)} />
+                        <EditInput label="日期" value={infoData.flights.outbound.date} onChange={v => updateFlight('outbound', 'date', v)} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <EditInput label="出發地" value={infoData.flights.outbound.fromCode} onChange={v => updateFlight('outbound', 'fromCode', v)} />
+                        <EditInput label="起飛時間" value={infoData.flights.outbound.depTime} onChange={v => updateFlight('outbound', 'depTime', v)} />
+                        <EditInput label="飛行時間" value={infoData.flights.outbound.duration} onChange={v => updateFlight('outbound', 'duration', v)} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                         <EditInput label="目的地" value={infoData.flights.outbound.toCode} onChange={v => updateFlight('outbound', 'toCode', v)} />
+                         <EditInput label="抵達時間" value={infoData.flights.outbound.arrTime} onChange={v => updateFlight('outbound', 'arrTime', v)} />
+                         <EditInput label="航廈" value={infoData.flights.outbound.terminal} onChange={v => updateFlight('outbound', 'terminal', v)} />
+                    </div>
+                </div>
+            ) : (
+                <BoardingPass 
+                  type="Outbound"
+                  data={infoData.flights.outbound}
+                />
+            )}
 
             {/* Inbound */}
-            <BoardingPass 
-              type="Inbound"
-              flightNo="CX402"
-              date="2025 Dec 15"
-              fromCode="HKG"
-              toCode="TPE"
-              depTime="18:30"
-              arrTime="20:15"
-              terminal="T1"
-            />
+            {isEditing ? (
+                <div className="bg-white p-4 rounded-xl border-2 border-dashed border-autumn-300">
+                    <h3 className="font-bold text-autumn-500 mb-2">回程 (Inbound) 編輯</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                        <EditInput label="航班號" value={infoData.flights.inbound.flightNo} onChange={v => updateFlight('inbound', 'flightNo', v)} />
+                        <EditInput label="日期" value={infoData.flights.inbound.date} onChange={v => updateFlight('inbound', 'date', v)} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <EditInput label="出發地" value={infoData.flights.inbound.fromCode} onChange={v => updateFlight('inbound', 'fromCode', v)} />
+                        <EditInput label="起飛時間" value={infoData.flights.inbound.depTime} onChange={v => updateFlight('inbound', 'depTime', v)} />
+                        <EditInput label="飛行時間" value={infoData.flights.inbound.duration} onChange={v => updateFlight('inbound', 'duration', v)} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                         <EditInput label="目的地" value={infoData.flights.inbound.toCode} onChange={v => updateFlight('inbound', 'toCode', v)} />
+                         <EditInput label="抵達時間" value={infoData.flights.inbound.arrTime} onChange={v => updateFlight('inbound', 'arrTime', v)} />
+                         <EditInput label="航廈" value={infoData.flights.inbound.terminal} onChange={v => updateFlight('inbound', 'terminal', v)} />
+                    </div>
+                </div>
+            ) : (
+                <BoardingPass 
+                  type="Inbound"
+                  data={infoData.flights.inbound}
+                />
+            )}
             
             <div className="bg-stone-100 p-3 rounded-xl border border-stone-200 text-stone-500 text-xs text-center">
                 請務必於起飛前 2.5 小時抵達機場辦理登機手續
@@ -362,6 +474,21 @@ const InfoView: React.FC = () => {
              <h2 className="text-2xl font-bold text-stone-800 border-l-4 border-autumn-400 pl-3">住宿資訊</h2>
              
              {/* Hotel Card */}
+             {isEditing ? (
+                 <div className="bg-white p-4 rounded-3xl border-2 border-dashed border-stone-800">
+                     <EditInput label="飯店名稱 (中文)" value={infoData.accommodation.name} onChange={v => setInfoData({...infoData, accommodation: {...infoData.accommodation, name: v}})} />
+                     <EditInput label="飯店名稱 (英文)" value={infoData.accommodation.enName} onChange={v => setInfoData({...infoData, accommodation: {...infoData.accommodation, enName: v}})} />
+                     <EditInput label="位置" value={infoData.accommodation.location} onChange={v => setInfoData({...infoData, accommodation: {...infoData.accommodation, location: v}})} />
+                     <EditInput label="Google Map 連結" value={infoData.accommodation.googleMapLink} onChange={v => setInfoData({...infoData, accommodation: {...infoData.accommodation, googleMapLink: v}})} />
+                     
+                     <label className="block text-xs font-bold text-stone-500 mb-1">描述</label>
+                     <textarea 
+                        value={infoData.accommodation.description}
+                        onChange={e => setInfoData({...infoData, accommodation: {...infoData.accommodation, description: e.target.value}})}
+                        className="w-full bg-stone-50 p-2 border border-stone-300 rounded-lg focus:border-autumn-300 outline-none text-sm h-24"
+                     />
+                 </div>
+             ) : (
              <div className="bg-white p-0 rounded-3xl border-2 border-stone-800 shadow-sketch overflow-hidden">
                 {/* Hotel Image with Fallback */}
                 <div className="h-48 w-full bg-stone-300 relative flex items-center justify-center overflow-hidden">
@@ -371,8 +498,8 @@ const InfoView: React.FC = () => {
                    {/* Gradient Overlay */}
                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent flex items-end p-4 z-20 pointer-events-none">
                       <div className="text-white">
-                         <h3 className="text-2xl font-bold leading-none shadow-black drop-shadow-md">{GENERAL_INFO.accommodation.name}</h3>
-                         <h4 className="text-sm font-sans opacity-90 drop-shadow-sm">{GENERAL_INFO.accommodation.enName}</h4>
+                         <h3 className="text-2xl font-bold leading-none shadow-black drop-shadow-md">{infoData.accommodation.name}</h3>
+                         <h4 className="text-sm font-sans opacity-90 drop-shadow-sm">{infoData.accommodation.enName}</h4>
                       </div>
                    </div>
                 </div>
@@ -381,7 +508,7 @@ const InfoView: React.FC = () => {
                    {/* Actions */}
                    <div className="flex gap-2 mb-4">
                       <a 
-                        href={GENERAL_INFO.accommodation.googleMapLink} 
+                        href={infoData.accommodation.googleMapLink} 
                         target="_blank" 
                         rel="noreferrer"
                         className="w-full flex items-center justify-center gap-2 bg-stone-800 text-white py-2.5 rounded-xl font-bold hover:bg-stone-700 transition-colors shadow-sm text-sm"
@@ -394,14 +521,15 @@ const InfoView: React.FC = () => {
                    <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
                       <div className="flex items-start gap-2 mb-2">
                          <Map className="w-4 h-4 text-autumn-400 mt-1 flex-shrink-0" />
-                         <span className="text-stone-700 font-bold">{GENERAL_INFO.accommodation.location}</span>
+                         <span className="text-stone-700 font-bold">{infoData.accommodation.location}</span>
                       </div>
                       <p className="text-stone-500 text-sm leading-relaxed whitespace-pre-line">
-                          {GENERAL_INFO.accommodation.description}
+                          {infoData.accommodation.description}
                       </p>
                    </div>
                 </div>
              </div>
+             )}
           </div>
         )}
 
@@ -409,8 +537,15 @@ const InfoView: React.FC = () => {
         {activeTab === 'tips' && (
           <div className="space-y-4 animate-fadeIn">
             <h2 className="text-2xl font-bold text-stone-800 border-l-4 border-autumn-200 pl-3">旅遊小貼士</h2>
+            
+            {isEditing && (
+                <div className="bg-yellow-50 p-3 rounded-lg text-sm text-stone-600 mb-2">
+                    目前暫不支援編輯貼士，請直接修改 constants.ts 或聯絡管理員。
+                </div>
+            )}
+
             <div className="grid gap-3">
-               {GENERAL_INFO.tips.map((tip, idx) => (
+               {infoData.tips.map((tip, idx) => (
                  <div key={idx} className="bg-white p-4 rounded-xl border-2 border-stone-800 shadow-sm flex gap-3 items-start">
                    <div className="text-autumn-300 font-bold text-xl mt-[-2px]">{idx + 1}.</div>
                    <div className="text-stone-700 text-lg leading-snug">{tip}</div>

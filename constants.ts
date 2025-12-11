@@ -377,8 +377,26 @@ export const ITINERARY_DATA: DailyItinerary[] = [
 
 export const GENERAL_INFO: GeneralInfo = {
   flights: {
-    outbound: 'CX 國泰 12/12 08:20 TPE → 10:30 HKG',
-    inbound: 'CX 國泰 12/15 18:30 HKG → 20:15 TPE'
+    outbound: {
+        flightNo: 'CX407',
+        date: '2025 Dec 12',
+        fromCode: 'TPE',
+        toCode: 'HKG',
+        depTime: '08:20',
+        arrTime: '10:30',
+        terminal: 'T1',
+        duration: '2h 10m'
+    },
+    inbound: {
+        flightNo: 'CX402',
+        date: '2025 Dec 15',
+        fromCode: 'HKG',
+        toCode: 'TPE',
+        depTime: '18:30',
+        arrTime: '20:15',
+        terminal: 'T1',
+        duration: '1h 45m'
+    }
   },
   accommodation: {
     name: '城景國際',
