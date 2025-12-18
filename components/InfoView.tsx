@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { GENERAL_INFO } from '../constants';
-import { GeneralInfo, FlightDetail } from '../types';
-import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle, RefreshCw, Edit3, Save, Check, Trash2, Plus } from 'lucide-react';
+import { GeneralInfo, FlightDetail, Expense, DailyItinerary } from '../types';
+import { Plane, Home, Lightbulb, Info, Map, Terminal, CheckCircle2, XCircle, RefreshCw, Edit3, Save, Check, Trash2, Plus, Database, FileJson, FileSpreadsheet, Download } from 'lucide-react';
 import { getDebugInfo, db, isFirebaseConfigured } from '../firebase';
-import { ref, set, remove, onValue } from 'firebase/database';
+import { ref, set, remove, onValue, get, child } from 'firebase/database';
 
-type InfoTab = 'flight' | 'hotel' | 'tips' | 'code';
+type InfoTab = 'flight' | 'hotel' | 'tips' | 'code' | 'data';
 
 // 精細素描風格飯店插圖 (藍天白雲版)
 const HotelIllustration = () => (
@@ -366,6 +366,87 @@ const InfoView: React.FC = () => {
     }
   };
 
+  // --- Export Functions ---
+
+  const downloadFile = (content: string, fileName: string, contentType: string) => {
+    const a = document.createElement("a");
+    const file = new Blob([content], { type: contentType });
+    a.href = URL.createObjectURL(file);
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const handleExportJSON = async () => {
+    if (!isFirebaseConfigured) {
+        alert("未連線至資料庫，無法下載完整資料。");
+        return;
+    }
+    
+    try {
+        const dbRef = ref(db);
+        const snapshot = await get(dbRef);
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            const jsonString = JSON.stringify(data, null, 2);
+            downloadFile(jsonString, `hk_trip_backup_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+        } else {
+            alert("資料庫中沒有資料。");
+        }
+    } catch (error) {
+        console.error(error);
+        alert("匯出失敗，請檢查網路。");
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (!isFirebaseConfigured) {
+        alert("未連線至資料庫。");
+        return;
+    }
+
+    try {
+        const snapshot = await get(child(ref(db), 'expenses'));
+        if (snapshot.exists()) {
+            const expensesData = snapshot.val();
+            const expenses: Expense[] = Object.values(expensesData);
+
+            // CSV Header
+            let csvContent = '\uFEFF'; // Add BOM for Excel UTF-8 compatibility
+            csvContent += "日期,類別,店家名稱,總金額(原幣),幣別,付款人,付款方式,分帳成員,細項內容\n";
+
+            expenses.forEach(exp => {
+                const subItemText = exp.details 
+                    ? exp.details.map(d => `${d.name}($${d.amount})`).join('; ') 
+                    : '';
+                
+                const beneficiariesText = (exp.beneficiaries || []).join('; ');
+
+                const row = [
+                    exp.date,
+                    exp.category,
+                    `"${exp.item.replace(/"/g, '""')}"`, // Handle quotes in store name
+                    exp.originalAmount,
+                    exp.currency,
+                    exp.paidBy,
+                    exp.paymentMethod,
+                    `"${beneficiariesText}"`,
+                    `"${subItemText.replace(/"/g, '""')}"`
+                ].join(",");
+                csvContent += row + "\n";
+            });
+
+            downloadFile(csvContent, `expenses_export_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+        } else {
+            alert("沒有記帳資料可匯出。");
+        }
+    } catch (error) {
+        console.error(error);
+        alert("匯出失敗。");
+    }
+  };
+
+
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Header with Edit Toggle */}
@@ -374,20 +455,22 @@ const InfoView: React.FC = () => {
              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-stone-300'}`}></div>
              {isOnline ? '已同步' : (isFirebaseConfigured ? '離線' : '未連線')}
          </span>
-         <button 
-           onClick={() => {
-               if(isEditing) handleSave();
-               else setIsEditing(true);
-           }}
-           className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-             isEditing 
-               ? 'bg-autumn-400 text-white shadow-sketch' 
-               : 'bg-white border border-stone-300 text-stone-500'
-           }`}
-         >
-           {isEditing ? <Save className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
-           {isEditing ? '儲存變更' : '編輯資訊'}
-         </button>
+         {activeTab !== 'data' && (
+            <button 
+                onClick={() => {
+                    if(isEditing) handleSave();
+                    else setIsEditing(true);
+                }}
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                isEditing 
+                    ? 'bg-autumn-400 text-white shadow-sketch' 
+                    : 'bg-white border border-stone-300 text-stone-500'
+                }`}
+            >
+                {isEditing ? <Save className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+                {isEditing ? '儲存變更' : '編輯資訊'}
+            </button>
+         )}
       </div>
 
       {/* Tab Navigation */}
@@ -415,6 +498,12 @@ const InfoView: React.FC = () => {
           onClick={() => setActiveTab('code')} 
           label="花碼" 
           icon={<Info className="w-4 h-4" />}
+        />
+        <TabButton 
+          active={activeTab === 'data'} 
+          onClick={() => setActiveTab('data')} 
+          label="備份" 
+          icon={<Database className="w-4 h-4" />}
         />
       </div>
 
@@ -624,11 +713,65 @@ const InfoView: React.FC = () => {
           </div>
         )}
 
+        {/* Data Backup Content */}
+        {activeTab === 'data' && (
+           <div className="space-y-6 animate-fadeIn">
+              <h2 className="text-2xl font-bold text-stone-800 border-l-4 border-blue-500 pl-3">資料備份</h2>
+              <div className="bg-stone-100 p-4 rounded-xl text-stone-600 text-sm">
+                 <p className="mb-2 font-bold flex items-center gap-2">
+                     <Info className="w-4 h-4 text-blue-500" />
+                     為什麼需要備份？
+                 </p>
+                 <p>目前的資料庫可能有使用期限。建議在旅程結束後，將珍貴的記帳與行程資料匯出保存。</p>
+              </div>
+
+              <div className="grid gap-4">
+                  {/* CSV Export */}
+                  <div className="bg-white p-5 rounded-2xl border-2 border-stone-800 shadow-sketch flex flex-col gap-3">
+                      <div className="flex items-center gap-3 mb-2">
+                          <div className="bg-green-100 p-2 rounded-lg text-green-600">
+                              <FileSpreadsheet className="w-6 h-6" />
+                          </div>
+                          <div>
+                              <h3 className="text-lg font-bold text-stone-800">匯出記帳 (CSV)</h3>
+                              <p className="text-xs text-stone-500">適合用 Excel 或 Google Sheets 開啟整理。</p>
+                          </div>
+                      </div>
+                      <button 
+                        onClick={handleExportCSV}
+                        className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+                      >
+                          <Download className="w-4 h-4" /> 下載 CSV 表格
+                      </button>
+                  </div>
+
+                  {/* JSON Export */}
+                  <div className="bg-white p-5 rounded-2xl border-2 border-stone-800 shadow-sketch flex flex-col gap-3">
+                      <div className="flex items-center gap-3 mb-2">
+                          <div className="bg-orange-100 p-2 rounded-lg text-orange-500">
+                              <FileJson className="w-6 h-6" />
+                          </div>
+                          <div>
+                              <h3 className="text-lg font-bold text-stone-800">完整備份 (JSON)</h3>
+                              <p className="text-xs text-stone-500">包含行程、記帳、設定等所有資料，格式為 JSON。</p>
+                          </div>
+                      </div>
+                      <button 
+                        onClick={handleExportJSON}
+                        className="w-full bg-white border-2 border-stone-300 text-stone-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+                      >
+                          <Download className="w-4 h-4" /> 下載完整資料包
+                      </button>
+                  </div>
+              </div>
+           </div>
+        )}
+
         {/* System Diagnostic Footer */}
         <div className="mt-8 pt-4 border-t-2 border-dashed border-stone-300 text-center space-y-2 pb-6">
             <div className="inline-flex items-center gap-2 bg-stone-200 px-3 py-1 rounded-full text-[10px] text-stone-600 font-mono tracking-wider">
                <Terminal className="w-3 h-3" />
-               SYSTEM DIAGNOSTIC (v1.2)
+               SYSTEM DIAGNOSTIC (v1.3)
             </div>
             
             <div className="grid grid-cols-2 gap-2 text-xs text-left">
